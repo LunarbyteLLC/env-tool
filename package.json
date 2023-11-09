@@ -4,7 +4,7 @@
   "description": "Tools to validate, generate, and update env files",
   "main": "index.js",
   "scripts": {
-    "build": "tsc .",
+    "build": "tsc --project ./",
     "env": "tsc && node dist/index.js --",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
