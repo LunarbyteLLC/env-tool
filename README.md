@@ -2,7 +2,23 @@
 
 ## Installation
 
-Coming soon
+Generate a new github personal access token
+https://github.com/settings/tokens/new?scopes=read:packages&description=npm-package-manager
+
+
+Edit `.npmrc` in your home directory and add the following lines. 
+Replace `<your_github_personal_token>` with the token you just generated.
+```text
+@lunarbytellc:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=<your_github_personal_token>
+```
+
+Finally run `npm install -g @lunarbytellc/env-tool`. 
+
+Run it to see the help description.
+```shell
+env-tool
+```
 
 ## Usage
 
@@ -12,7 +28,7 @@ List usages of `process.env` variables in your code. Does not write any files.
 
 
 ```shell
-npx env-tool audit example/
+env-tool audit example/
 ```
 ### Init
 
@@ -21,7 +37,7 @@ The schema file is used for validating your `.env` file and syncing it with futu
 
 ```shell
 # create a schema by scanning the example/ directory
-npx env-tool init example/
+env-tool init example/
 ```
 
 ### Create
@@ -29,7 +45,7 @@ npx env-tool init example/
 Create a well-formed env file based on the schema.  This will overwrite any file that already exists
 with the same name. **Proceed with caution**.
 ```shell
-npx env-tool create .env
+env-tool create .env
 ```
 
 
@@ -39,7 +55,7 @@ Compare your current `.env` file against the schema. Checks for undefined variab
 are required, or variables with no value that are required.
 
 ```shell
-npx env-tool validate .env
+env-tool validate .env
 ```
 
 
@@ -51,5 +67,5 @@ with any applicable default values.
 
 
 ```shell
-npx env-tool sync .env
+env-tool sync .env
 ```
