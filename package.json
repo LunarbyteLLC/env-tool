@@ -1,5 +1,5 @@
 {
-  "name": "env-tool",
+  "name": "@lunarbytellc/env-tool",
   "version": "1.0.0",
   "description": "Tools to validate, generate, and update env files",
   "main": "index.js",
@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "envtool": "dist/index.js"
+    "env-tool": "dist/index.js"
   },
   "author": "Ben Daschel",
   "license": "ISC",
