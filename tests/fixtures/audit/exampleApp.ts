@@ -12,6 +12,13 @@ function doStuff() {
     if (process.env.ENABLE_MAIL_SEND){
         sendMail('recipient@example.com', process.env.FROM_EMAIL!);
     }
+
+    // danger: undocumented but required variable
+
+    const encryptionKey = process.env.ENCRYPTION_KEY!;
+    if (! encryptionKey) {
+        throw new Error('Ahhhh somebody didnt set an encryption key');
+    }
 }
 
 function sendMail(to: string, from: string) {

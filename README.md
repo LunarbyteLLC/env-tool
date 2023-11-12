@@ -25,6 +25,8 @@ env-tool
 ### Audit
 
 List usages of `process.env` variables in your code. Does not write any files.
+Use this command to check for undocumented references to  `process.env` variables.
+You might run this in your CI system to prevent deploying a new feature and forgetting to set up some API_KEY env variable. 
 
 
 ```shell

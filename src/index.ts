@@ -2,50 +2,26 @@
 
 import {Command} from 'commander';
 import fs from "fs";
-import path from "path";
 import {parse} from "dotenv"
 import process from "process";
+import {audit, initSchema, loadSchema, scanVars} from "./lib";
+
 const program = new Command();
 
 const DEFAULT_SCHEMA_FILE = './envconfig.json';
-
-function scanVars(dir: string) {
-    const envVars = new Set<string>();
-
-    function traverseDir(dir: string) {
-        fs.readdirSync(dir).forEach(file => {
-            let fullPath = path.join(dir, file);
-            if (fs.lstatSync(fullPath).isDirectory()) {
-                traverseDir(fullPath);
-            } else {
-                const content = fs.readFileSync(fullPath).toString('utf-8');
-
-                const matches = content.matchAll(/process\.env\.(\w+)/gm)
-                for (const match of matches) {
-                    envVars.add(match[1])
-                }
-            }
-        });
-    }
-
-    traverseDir(dir);
-
-    return envVars;
-}
-
-function loadSchema() {
-    const contents = fs.readFileSync(DEFAULT_SCHEMA_FILE).toString('utf-8');
-    const config = JSON.parse(contents);
-    return config;
-}
 
 program.command('audit')
     .arguments('<dir>')
     .action((dir) => {
 
         const vars = scanVars(dir);
-        for (const env of vars) {
-            console.log(env);
+        const schema = loadSchema();
+
+        const issues = audit(vars, schema);
+
+        if (issues.length > 0) {
+            console.log(issues.join('\n'));
+            process.exitCode = 1;
         }
     })
 
@@ -60,14 +36,7 @@ program.command('init')
         }
         const vars = scanVars(dir);
 
-        const out: {[key: string]: any} = {};
-        for (const env of vars) {
-            out[env] = {
-                required: true,
-                default: '',
-                comment: 'This var does something useful'
-            }
-        }
+        const out = initSchema(vars);
         fs.writeFileSync(DEFAULT_SCHEMA_FILE, JSON.stringify(out, null, 4))
     })
 
@@ -97,7 +66,7 @@ program.command('validate')
         const envContent = fs.readFileSync(envfile);
         const parsedEnv = parse(envContent);
 
-        let anyFailures = false;
+        const issues: string[] = [];
         for (const key in schema) {
             const config = schema[key];
 
@@ -105,15 +74,14 @@ program.command('validate')
             const currentValue = isDefined ? parsedEnv[key] : undefined;
             if (config.required) {
                 if (!isDefined) {
-                    console.warn(`${key} is required, but is not defined in ${envfile}`);
-                    anyFailures = true;
+                    issues.push(`${key} is required, but is not defined in ${envfile}`)
                 } else if (!currentValue) {
-                    console.warn(`${key} is required, but has no value in ${envfile}`);
-                    anyFailures = true;
+                    issues.push(`${key} is required, but has no value in ${envfile}`);
                 }
             }
         }
-        if (anyFailures) {
+        if (issues.length > 0) {
+            console.warn(issues.join('\n'))
             process.exitCode = 1;
         }
     });
