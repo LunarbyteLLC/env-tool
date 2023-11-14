@@ -1,4 +1,4 @@
-name: Build and Publish
+name: Run tests
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Build & Test
+    name: Run Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3     # checkout the repo
