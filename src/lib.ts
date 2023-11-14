@@ -59,3 +59,61 @@ export function initSchema(vars: string[]) {
     }
     return out;
 }
+
+export function generateEnvFile(schema: EnvSchema) {
+    const out: string[] = [];
+    for (const key in schema) {
+        const value = schema[key];
+        if (value.comment) {
+            out.push(`### ${value.comment}`)
+        }
+        out.push(`${key}=${value.default}\n`)
+    }
+    const formatted = out.join('\n');
+    return formatted;
+}
+
+export interface ValidationResult {
+    key: string,
+    error: 'not_defined' | 'no_value'
+}[]
+
+export function validate(schema: EnvSchema, envValues: any) {
+    const issues: ValidationResult[] = [];
+    for (const key in schema) {
+        const config = schema[key];
+        const isDefined = envValues.hasOwnProperty(key)
+        const currentValue = isDefined ? envValues[key] : undefined;
+        if (config.required) {
+            if (!isDefined) {
+                issues.push({ key, error: 'not_defined'})
+            } else if (!currentValue) {
+                issues.push({key, error: 'no_value'});
+            }
+        }
+    }
+    return issues;
+}
+
+export function syncEnvFile(schema: EnvSchema, currentValues: any) {
+    const out: string[] = [];
+    for (const key in schema) {
+        const config = schema[key];
+
+        const isDefined = currentValues.hasOwnProperty(key)
+        const currentValue = isDefined ? currentValues[key] : undefined;
+
+
+        if (config.comment) {
+            out.push(`### ${config.comment}`)
+        }
+
+        if (isDefined) {
+            out.push(`${key}=${currentValue}\n`);
+        } else {
+            out.push(`${key}=${config.default}\n`)
+        }
+    }
+    const contents = out.join('\n');
+    return contents;
+}

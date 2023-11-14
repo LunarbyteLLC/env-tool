@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --project ./",
     "env": "tsc && node dist/index.js --",
-    "test": "mocha -r ts-node/register --exit 'src/**/*.spec.ts'"
+    "test": "mocha -r ts-node/register --exit  --reporter json --reporter-option output=test-result.json 'tests/**/*.spec.ts'"
   },
   "bin": {
     "env-tool": "dist/index.js"

@@ -4,7 +4,7 @@ import {Command} from 'commander';
 import fs from "fs";
 import {parse} from "dotenv"
 import process from "process";
-import {audit, initSchema, loadSchema, scanVars} from "./lib";
+import {audit, generateEnvFile, initSchema, loadSchema, scanVars, syncEnvFile, validate} from "./lib";
 
 const program = new Command();
 
@@ -13,12 +13,9 @@ const DEFAULT_SCHEMA_FILE = './envconfig.json';
 program.command('audit')
     .arguments('<dir>')
     .action((dir) => {
-
         const vars = scanVars(dir);
-        const schema = loadSchema();
-
+        const schema = loadSchema(DEFAULT_SCHEMA_FILE);
         const issues = audit(vars, schema);
-
         if (issues.length > 0) {
             console.log(issues.join('\n'));
             process.exitCode = 1;
@@ -35,7 +32,6 @@ program.command('init')
             return;
         }
         const vars = scanVars(dir);
-
         const out = initSchema(vars);
         fs.writeFileSync(DEFAULT_SCHEMA_FILE, JSON.stringify(out, null, 4))
     })
@@ -44,17 +40,8 @@ program.command('create')
     .arguments('<outfile>')
     .action((outfile) => {
 
-        const schema = loadSchema();
-
-        const out : string[] = [];
-        for (const key in schema) {
-            const value = schema[key];
-            if (value.comment) {
-                out.push(`### ${value.comment}`)
-            }
-            out.push(`${key}=${value.default}\n`)
-        }
-        const formatted = out.join('\n');
+        const schema = loadSchema(DEFAULT_SCHEMA_FILE);
+        const formatted = generateEnvFile(schema);
         fs.writeFileSync(outfile, formatted);
     });
 
@@ -62,24 +49,10 @@ program.command('create')
 program.command('validate')
     .arguments('<envfile>')
     .action((envfile) => {
-        const schema = loadSchema();
+        const schema = loadSchema(DEFAULT_SCHEMA_FILE);
         const envContent = fs.readFileSync(envfile);
         const parsedEnv = parse(envContent);
-
-        const issues: string[] = [];
-        for (const key in schema) {
-            const config = schema[key];
-
-            const isDefined = parsedEnv.hasOwnProperty(key)
-            const currentValue = isDefined ? parsedEnv[key] : undefined;
-            if (config.required) {
-                if (!isDefined) {
-                    issues.push(`${key} is required, but is not defined in ${envfile}`)
-                } else if (!currentValue) {
-                    issues.push(`${key} is required, but has no value in ${envfile}`);
-                }
-            }
-        }
+        const issues = validate(schema, parsedEnv);
         if (issues.length > 0) {
             console.warn(issues.join('\n'))
             process.exitCode = 1;
@@ -89,29 +62,10 @@ program.command('validate')
 program.command('sync')
     .arguments('<envfile>')
     .action((envfile) => {
-        const schema = loadSchema();
+        const schema = loadSchema(DEFAULT_SCHEMA_FILE);
         const envContent = fs.readFileSync(envfile);
         const parsedEnv = parse(envContent);
-
-        const out: string[] = [];
-        for (const key in schema) {
-            const config = schema[key];
-
-            const isDefined = parsedEnv.hasOwnProperty(key)
-            const currentValue = isDefined ? parsedEnv[key] : undefined;
-
-
-            if (config.comment) {
-                out.push(`### ${config.comment}`)
-            }
-
-            if (isDefined) {
-                out.push(`${key}=${currentValue}\n`);
-            } else {
-                out.push(`${key}=${config.default}\n`)
-            }
-        }
-        const contents = out.join('\n');
+        const contents = syncEnvFile(schema, parsedEnv);
         fs.writeFileSync(envfile, contents);
     });
 
