@@ -3,6 +3,7 @@ import {expect} from "chai";
 import fs from "fs";
 import {Command} from "commander";
 import {loadSchema} from "../src/lib";
+import {afterEach} from "mocha";
 
 const schemaTempFile = 'envconfig.json';
 
@@ -16,6 +17,9 @@ describe('env-tool cli', function () {
         program = createCli();
     })
 
+    afterEach(() => {
+        process.exitCode = 0;
+    })
 
     it ('should init env from existing code', function() {
         process.chdir('tests/fixtures/init')
