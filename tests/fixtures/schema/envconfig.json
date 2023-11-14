@@ -1,0 +1,17 @@
+{
+    "MY_API_KEY": {
+        "required": true,
+        "default": "",
+        "comment": "This var does something useful"
+    },
+    "ENABLE_MAIL_SEND": {
+        "required": true,
+        "default": "",
+        "comment": "This var does something useful"
+    },
+    "FROM_EMAIL": {
+        "required": true,
+        "default": "",
+        "comment": "This var does something useful"
+    }
+}

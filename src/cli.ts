@@ -1,4 +1,4 @@
-import {Command} from 'commander';
+import {Command, CommanderError} from 'commander';
 import {audit, generateEnvFile, initSchema, loadSchema, scanVars, syncEnvFile, validate} from "./lib";
 import process from "process";
 import fs from "fs";
@@ -15,9 +15,9 @@ export function createCli() {
         .option('-f --force', 'Overwrite existing schema file', false)
         .action((dir, options) => {
             if (fs.existsSync(DEFAULT_SCHEMA_FILE) && !options.force) {
-                console.error(`${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`);
-                process.exitCode = 1;
-                return;
+                // console.error(`${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`);
+                // process.exitCode = 1;
+                throw new CommanderError(1,'SCHEMA_EXISTS', `${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`)
             }
             const vars = scanVars(dir);
             const out = initSchema(vars);
@@ -32,7 +32,7 @@ export function createCli() {
             const issues = audit(vars, schema);
             if (issues.length > 0) {
                 console.log(issues.join('\n'));
-                process.exitCode = 1;
+                // process.exitCode = 1;
             }
         })
 
@@ -55,7 +55,7 @@ export function createCli() {
             const issues = validate(schema, parsedEnv);
             if (issues.length > 0) {
                 console.warn(issues.join('\n'))
-                process.exitCode = 1;
+                // process.exitCode = 1;
             }
         });
 

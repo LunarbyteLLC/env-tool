@@ -1,7 +1,7 @@
 import {createCli} from "../src/cli";
 import {expect} from "chai";
 import fs from "fs";
-import {Command} from "commander";
+import {Command, CommanderError} from "commander";
 import {loadSchema} from "../src/lib";
 import {afterEach} from "mocha";
 
@@ -21,7 +21,7 @@ describe('env-tool cli', function () {
         process.exitCode = 0;
     })
 
-    it ('should init env from existing code', function() {
+    it('should init env from existing code', function () {
         process.chdir('tests/fixtures/init')
         program.parse(['init', 'src'], {from: 'user'})
         expect(fs.existsSync(schemaTempFile)).to.be.true;
@@ -33,17 +33,23 @@ describe('env-tool cli', function () {
         }
     })
 
-    it ('should error if existing schema with --force option', function() {
+    it('should error if existing schema with --force option', function () {
         process.chdir('tests/fixtures/init-force')
-        program.parse(['init', 'src'], {from: 'user'})
-        expect(process.exitCode).to.be.equal(1);
+        try {
+            program.parse(['init', 'src'], {from: 'user'})
+
+        } catch (e: any) {
+            expect(e.exitCode).to.be.equal(1);
+            expect(e.code).to.be.equal('SCHEMA_EXISTS');
+        }
     })
 
-    it ('should overwrite existing schema using --force', function () {
+    it('should overwrite existing schema using --force', function () {
         // todo: test override flag: no exit code, overwrites empty file with new stuff
-        function mkEmptySchema () {
+        function mkEmptySchema() {
             fs.writeFileSync(schemaTempFile, '{}');
         }
+
         process.chdir('tests/fixtures/init-force-override')
         mkEmptySchema()
         program.parse(['init', 'src', '--force'], {from: 'user'});
