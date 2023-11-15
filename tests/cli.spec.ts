@@ -19,6 +19,7 @@ describe('env-tool cli', function () {
 
     afterEach(() => {
         process.exitCode = 0;
+        process.chdir(rootDir);
     })
 
     it('should init env from existing code', function () {
