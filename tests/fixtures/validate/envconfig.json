@@ -1,0 +1,7 @@
+{
+  "REQUIRED_VAR": {
+    "required": true,
+    "comment": "this is required",
+    "default": ""
+  }
+}

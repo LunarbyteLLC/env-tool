@@ -32,19 +32,9 @@ export function createCli() {
             const issues = audit(vars, schema);
             if (issues.length > 0) {
                 console.log(issues.join('\n'));
-                // process.exitCode = 1;
+                process.exitCode = 1;
             }
         })
-
-    program.command('create')
-        .arguments('<outfile>')
-        .action((outfile) => {
-
-            const schema = loadSchema(DEFAULT_SCHEMA_FILE);
-            const formatted = generateEnvFile(schema);
-            fs.writeFileSync(outfile, formatted);
-        });
-
 
     program.command('validate')
         .arguments('<envfile>')
@@ -55,7 +45,7 @@ export function createCli() {
             const issues = validate(schema, parsedEnv);
             if (issues.length > 0) {
                 console.warn(issues.join('\n'))
-                // process.exitCode = 1;
+                process.exitCode = 1;
             }
         });
 
@@ -63,7 +53,14 @@ export function createCli() {
         .arguments('<envfile>')
         .action((envfile) => {
             const schema = loadSchema(DEFAULT_SCHEMA_FILE);
-            const envContent = fs.readFileSync(envfile);
+
+            let envContent: Buffer;
+            try {
+                envContent = fs.readFileSync(envfile);
+
+            } catch(e: any) {
+                envContent = Buffer.from('')
+            }
             const parsedEnv = parse(envContent);
             const contents = syncEnvFile(schema, parsedEnv);
             fs.writeFileSync(envfile, contents);
