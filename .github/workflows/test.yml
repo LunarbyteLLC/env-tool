@@ -1,0 +1,27 @@
+name: Run tests
+
+on:
+  push:
+    branches:
+      - '**'
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  test:
+    name: Run Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3     # checkout the repo
+      - run: npm ci                   # install packages
+      - run: npm test                 # run tests (configured to use jest-junit reporter)
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()    # run this step even if previous step failed
+        with:
+          name: Unit Tests            # Name of the check run which will be created
+          path: test-result.json    # Path to test results
+          reporter: mocha-json        # Format of test results

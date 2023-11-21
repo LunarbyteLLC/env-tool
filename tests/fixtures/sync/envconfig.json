@@ -1,0 +1,12 @@
+{
+  "TEST_ENV_VAR": {
+    "default": "default_value",
+    "required": true,
+    "comment": "Some comment about variable"
+  },
+  "TEST_VAR_2": {
+    "default": "default_value",
+    "required": true,
+    "comment": "comment about 2nd var"
+  }
+}

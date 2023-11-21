@@ -25,6 +25,8 @@ env-tool
 ### Audit
 
 List usages of `process.env` variables in your code. Does not write any files.
+Use this command to check for undocumented references to  `process.env` variables.
+You might run this in your CI system to prevent deploying a new feature and forgetting to set up some API_KEY env variable. 
 
 
 ```shell
@@ -40,15 +42,6 @@ The schema file is used for validating your `.env` file and syncing it with futu
 env-tool init example/
 ```
 
-### Create
-
-Create a well-formed env file based on the schema.  This will overwrite any file that already exists
-with the same name. **Proceed with caution**.
-```shell
-env-tool create .env
-```
-
-
 ### Validate
 
 Compare your current `.env` file against the schema. Checks for undefined variables that
@@ -60,6 +53,8 @@ env-tool validate .env
 
 
 ### Sync
+
+Creates or updates an env file.
 
 As the project changes, you may want to update your env file to declare the latest variables. 
 This will overwrite the current env file, but keeps your existing values. New variables are declared 
