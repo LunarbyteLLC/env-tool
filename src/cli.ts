@@ -15,8 +15,6 @@ export function createCli() {
         .option('-f --force', 'Overwrite existing schema file', false)
         .action((dir, options) => {
             if (fs.existsSync(DEFAULT_SCHEMA_FILE) && !options.force) {
-                // console.error(`${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`);
-                // process.exitCode = 1;
                 throw new CommanderError(1,'SCHEMA_EXISTS', `${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`)
             }
             const vars = scanVars(dir);
@@ -31,8 +29,7 @@ export function createCli() {
             const schema = loadSchema(DEFAULT_SCHEMA_FILE);
             const issues = audit(vars, schema);
             if (issues.length > 0) {
-                console.log(issues.join('\n'));
-                process.exitCode = 1;
+                throw new CommanderError(1, 'AUDIT_FAIL', issues.join('\n'))
             }
         })
 
@@ -44,8 +41,7 @@ export function createCli() {
             const parsedEnv = parse(envContent);
             const issues = validate(schema, parsedEnv);
             if (issues.length > 0) {
-                console.warn(issues.join('\n'))
-                process.exitCode = 1;
+                throw new CommanderError(1, 'VALIDATE_FAIL', issues.join('/n'))
             }
         });
 

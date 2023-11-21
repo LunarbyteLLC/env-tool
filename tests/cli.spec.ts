@@ -1,7 +1,7 @@
 import {createCli} from "../src/cli";
-import {assert, expect} from "chai";
+import {expect} from "chai";
 import fs from "fs";
-import {Command, CommanderError} from "commander";
+import {Command} from "commander";
 import {loadSchema} from "../src/lib";
 import {afterEach} from "mocha";
 
@@ -48,7 +48,6 @@ describe('env-tool cli', function () {
         })
 
         it('should overwrite existing schema using --force', function () {
-            // todo: test override flag: no exit code, overwrites empty file with new stuff
             function mkEmptySchema() {
                 fs.writeFileSync(schemaTempFile, '{}');
             }
@@ -80,9 +79,14 @@ describe('env-tool cli', function () {
 
         it ('should exit with error if undocumented vars are found', function() {
             process.chdir('tests/fixtures/audit')
-            program.parse(['audit', 'src-bad'], {from: 'user'});
 
-            expect(process.exitCode).to.be.equal(1);
+            try {
+                program.parse(['audit', 'src-bad'], {from: 'user'});
+            } catch (e: any) {
+                expect(e.exitCode).to.be.equal(1);
+                expect(e.code).to.be.equal('AUDIT_FAIL')
+            }
+
         })
 
     })
@@ -92,17 +96,23 @@ describe('env-tool cli', function () {
         it ('should exit with error if env file has missing required vars', function() {
 
             process.chdir('tests/fixtures/validate')
-            program.parse(['validate', 'undefined-vars.env'], {from: 'user'});
+            try {
+                program.parse(['validate', 'undefined-vars.env'], {from: 'user'});
+            } catch (e: any) {
+                expect(e.exitCode).to.equal(1);
+                expect(e.code).to.equal('VALIDATE_FAIL');
+            }
 
-            expect(process.exitCode).to.equal(1);
         })
 
         it ('should exit with error if required vars have no value', function() {
-
             process.chdir('tests/fixtures/validate')
-            program.parse(['validate', 'missing-vars.env'], {from: 'user'});
-
-            expect(process.exitCode).to.equal(1);
+            try {
+                program.parse(['validate', 'missing-vars.env'], {from: 'user'});
+            } catch (e: any) {
+                expect(e.exitCode).to.equal(1);
+                expect(e.code).to.equal('VALIDATE_FAIL');
+            }
         })
 
         it ('should exit 0 if env file matches schema', function() {
