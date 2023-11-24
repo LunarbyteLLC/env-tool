@@ -29,7 +29,8 @@ export function createCli() {
             const schema = loadSchema(DEFAULT_SCHEMA_FILE);
             const issues = audit(vars, schema);
             if (issues.length > 0) {
-                throw new CommanderError(1, 'AUDIT_FAIL', issues.join('\n'))
+                console.warn( issues.join('\n'))
+                process.exitCode = 1;
             }
         })
 

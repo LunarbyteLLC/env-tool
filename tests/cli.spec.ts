@@ -1,9 +1,7 @@
 import {createCli} from "../src/cli";
-import {expect} from "chai";
 import fs from "fs";
 import {Command} from "commander";
 import {loadSchema} from "../src/lib";
-import {afterEach} from "mocha";
 
 const schemaTempFile = 'envconfig.json';
 
@@ -11,15 +9,18 @@ describe('env-tool cli', function () {
 
     const rootDir = process.cwd();
     let program: Command;
-
+    const consoleWarn = console.warn;
     beforeEach(() => {
+        process.exitCode = 0;
         process.chdir(rootDir);
         program = createCli();
+        console.warn = jest.fn()
     })
 
     afterEach(() => {
         process.exitCode = 0;
         process.chdir(rootDir);
+        console.warn = consoleWarn;
     })
 
     describe('init', function () {
@@ -27,7 +28,7 @@ describe('env-tool cli', function () {
         it('should init env from existing code', function () {
             process.chdir('tests/fixtures/init')
             program.parse(['init', 'src'], {from: 'user'})
-            expect(fs.existsSync(schemaTempFile)).to.be.true;
+            expect(fs.existsSync(schemaTempFile)).toBeTruthy()
 
             try {
                 fs.unlinkSync(schemaTempFile);
@@ -42,8 +43,8 @@ describe('env-tool cli', function () {
                 program.parse(['init', 'src'], {from: 'user'})
 
             } catch (e: any) {
-                expect(e.exitCode).to.be.equal(1);
-                expect(e.code).to.be.equal('SCHEMA_EXISTS');
+                expect(e.exitCode).toEqual(1);
+                expect(e.code).toEqual('SCHEMA_EXISTS');
             }
         })
 
@@ -57,7 +58,7 @@ describe('env-tool cli', function () {
             program.parse(['init', 'src', '--force'], {from: 'user'});
 
             const schema = loadSchema(schemaTempFile);
-            expect(Object.keys(schema)).to.have.length.greaterThan(0)
+            expect(Object.keys(schema).length).toBeGreaterThan(0)
             try {
                 fs.unlinkSync(schemaTempFile);
             } catch (e) {
@@ -74,19 +75,18 @@ describe('env-tool cli', function () {
             process.chdir('tests/fixtures/audit')
             program.parse(['audit', 'src-good'], {from: 'user'});
 
-            expect(process.exitCode).to.be.equal(0);
+            expect(process.exitCode).toEqual(0);
         })
 
         it ('should exit with error if undocumented vars are found', function() {
             process.chdir('tests/fixtures/audit')
 
-            try {
                 program.parse(['audit', 'src-bad'], {from: 'user'});
-            } catch (e: any) {
-                expect(e.exitCode).to.be.equal(1);
-                expect(e.code).to.be.equal('AUDIT_FAIL')
-            }
+                expect(process.exitCode).toEqual(1);
 
+                //@ts-ignore
+                const output = console.warn.mock.lastCall[0];
+                expect(output).toContain('is not defined')
         })
 
     })
@@ -99,8 +99,8 @@ describe('env-tool cli', function () {
             try {
                 program.parse(['validate', 'undefined-vars.env'], {from: 'user'});
             } catch (e: any) {
-                expect(e.exitCode).to.equal(1);
-                expect(e.code).to.equal('VALIDATE_FAIL');
+                expect(e.exitCode).toEqual(1);
+                expect(e.code).toEqual('VALIDATE_FAIL');
             }
 
         })
@@ -110,8 +110,8 @@ describe('env-tool cli', function () {
             try {
                 program.parse(['validate', 'missing-vars.env'], {from: 'user'});
             } catch (e: any) {
-                expect(e.exitCode).to.equal(1);
-                expect(e.code).to.equal('VALIDATE_FAIL');
+                expect(e.exitCode).toEqual(1);
+                expect(e.code).toEqual('VALIDATE_FAIL');
             }
         })
 
@@ -119,7 +119,7 @@ describe('env-tool cli', function () {
             process.chdir('tests/fixtures/validate')
             program.parse(['validate', 'good.env'], {from: 'user'});
 
-            expect(process.exitCode).to.equal(0);
+            expect(process.exitCode).toEqual(0);
         })
     });
 
@@ -128,8 +128,8 @@ describe('env-tool cli', function () {
             process.chdir('tests/fixtures/sync');
             program.parse(['sync', 'out.env'], {from: "user"});
 
-            expect(fs.existsSync('out.env')).to.be.true;
-            expect(fs.readFileSync('out.env')).to.have.length.greaterThan(0)
+            expect(fs.existsSync('out.env')).toBeTruthy();
+            expect(fs.readFileSync('out.env').length).toBeGreaterThan(0)
 
             // cleanup
             fs.unlinkSync('out.env');
@@ -143,10 +143,10 @@ describe('env-tool cli', function () {
             `)
             program.parse(['sync', 'out.env'], {from: "user"});
 
-            expect(fs.existsSync('out.env')).to.be.true;
-            expect(fs.readFileSync('out.env')).to.have.length.greaterThan(0)
-            expect(fs.readFileSync('out.env').toString()).to.contain('TEST_ENV_VAR=not_default_value')
-            expect(fs.readFileSync('out.env').toString()).to.contain('TEST_VAR_2=default_value')
+            expect(fs.existsSync('out.env')).toBeTruthy()
+            expect(fs.readFileSync('out.env').length).toBeGreaterThan(0)
+            expect(fs.readFileSync('out.env').toString()).toContain('TEST_ENV_VAR=not_default_value')
+            expect(fs.readFileSync('out.env').toString()).toContain('TEST_VAR_2=default_value')
 
             // cleanup
             fs.unlinkSync('out.env');
