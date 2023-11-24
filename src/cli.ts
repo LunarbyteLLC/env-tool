@@ -15,7 +15,9 @@ export function createCli() {
         .option('-f --force', 'Overwrite existing schema file', false)
         .action((dir, options) => {
             if (fs.existsSync(DEFAULT_SCHEMA_FILE) && !options.force) {
-                throw new CommanderError(1,'SCHEMA_EXISTS', `${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`)
+                process.exitCode = 1;
+                console.warn(`${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`)
+                return;
             }
             const vars = scanVars(dir);
             const out = initSchema(vars);
@@ -42,7 +44,14 @@ export function createCli() {
             const parsedEnv = parse(envContent);
             const issues = validate(schema, parsedEnv);
             if (issues.length > 0) {
-                throw new CommanderError(1, 'VALIDATE_FAIL', issues.join('/n'))
+                const issueLabels = {
+                    no_value: 'has no value',
+                    not_defined: 'is not defined'
+                }
+                process.exitCode = 1;
+                console.warn(
+                    issues.map(iss => `${iss.key} ${issueLabels[iss.error]} in ${envfile}`).join('\n')
+                );
             }
         });
 
