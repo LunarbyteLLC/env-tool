@@ -1,9 +1,7 @@
 import {createCli} from "../src/cli";
-import {expect} from "chai";
 import fs from "fs";
 import {Command} from "commander";
 import {loadSchema} from "../src/lib";
-import {afterEach} from "mocha";
 
 const schemaTempFile = 'envconfig.json';
 
@@ -11,15 +9,18 @@ describe('env-tool cli', function () {
 
     const rootDir = process.cwd();
     let program: Command;
-
+    const consoleWarn = console.warn;
     beforeEach(() => {
+        process.exitCode = 0;
         process.chdir(rootDir);
         program = createCli();
+        console.warn = jest.fn()
     })
 
     afterEach(() => {
         process.exitCode = 0;
         process.chdir(rootDir);
+        console.warn = consoleWarn;
     })
 
     describe('init', function () {
@@ -27,7 +28,7 @@ describe('env-tool cli', function () {
         it('should init env from existing code', function () {
             process.chdir('tests/fixtures/init')
             program.parse(['init', 'src'], {from: 'user'})
-            expect(fs.existsSync(schemaTempFile)).to.be.true;
+            expect(fs.existsSync(schemaTempFile)).toBeTruthy()
 
             try {
                 fs.unlinkSync(schemaTempFile);
@@ -38,13 +39,11 @@ describe('env-tool cli', function () {
 
         it('should error if existing schema with --force option', function () {
             process.chdir('tests/fixtures/init-force')
-            try {
-                program.parse(['init', 'src'], {from: 'user'})
+            program.parse(['init', 'src'], {from: 'user'})
 
-            } catch (e: any) {
-                expect(e.exitCode).to.be.equal(1);
-                expect(e.code).to.be.equal('SCHEMA_EXISTS');
-            }
+            expect(process.exitCode).toEqual(1);
+            //@ts-ignore
+            expect(console.warn.mock.lastCall[0]).toContain('already exists');
         })
 
         it('should overwrite existing schema using --force', function () {
@@ -57,7 +56,7 @@ describe('env-tool cli', function () {
             program.parse(['init', 'src', '--force'], {from: 'user'});
 
             const schema = loadSchema(schemaTempFile);
-            expect(Object.keys(schema)).to.have.length.greaterThan(0)
+            expect(Object.keys(schema).length).toBeGreaterThan(0)
             try {
                 fs.unlinkSync(schemaTempFile);
             } catch (e) {
@@ -70,72 +69,66 @@ describe('env-tool cli', function () {
     describe('audit', function () {
 
 
-        it ('should exit 0 if no undocumented vars are found', function() {
+        it('should exit 0 if no undocumented vars are found', function () {
             process.chdir('tests/fixtures/audit')
             program.parse(['audit', 'src-good'], {from: 'user'});
-
-            expect(process.exitCode).to.be.equal(0);
+            expect(process.exitCode).toEqual(0);
         })
 
-        it ('should exit with error if undocumented vars are found', function() {
+        it('should exit with error if undocumented vars are found', function () {
             process.chdir('tests/fixtures/audit')
-
-            try {
-                program.parse(['audit', 'src-bad'], {from: 'user'});
-            } catch (e: any) {
-                expect(e.exitCode).to.be.equal(1);
-                expect(e.code).to.be.equal('AUDIT_FAIL')
-            }
-
+            program.parse(['audit', 'src-bad'], {from: 'user'});
+            expect(process.exitCode).toEqual(1);
+            //@ts-ignore
+            const output = console.warn.mock.lastCall[0];
+            expect(output).toContain('is not defined')
         })
 
     })
 
-    describe('validate', function() {
+    describe('validate', function () {
 
-        it ('should exit with error if env file has missing required vars', function() {
-
+        it('should exit with error if env file has missing required vars', function () {
             process.chdir('tests/fixtures/validate')
-            try {
-                program.parse(['validate', 'undefined-vars.env'], {from: 'user'});
-            } catch (e: any) {
-                expect(e.exitCode).to.equal(1);
-                expect(e.code).to.equal('VALIDATE_FAIL');
-            }
+            program.parse(['validate', 'missing-vars.env'], {from: 'user'});
+            expect(process.exitCode).toEqual(1);
+            //@ts-ignore
+            const output = console.warn.mock.lastCall[0];
+            expect(output).toContain('is not defined')
 
         })
 
-        it ('should exit with error if required vars have no value', function() {
+        it('should exit with error if required vars have no value', function () {
             process.chdir('tests/fixtures/validate')
-            try {
-                program.parse(['validate', 'missing-vars.env'], {from: 'user'});
-            } catch (e: any) {
-                expect(e.exitCode).to.equal(1);
-                expect(e.code).to.equal('VALIDATE_FAIL');
-            }
+            program.parse(['validate', 'undefined-vars.env'], {from: 'user'});
+            expect(process.exitCode).toEqual(1);
+
+            //@ts-ignore
+            expect(console.warn.mock.lastCall[0]).toContain('has no value')
+            // expect(e.code).toEqual('VALIDATE_FAIL');
         })
 
-        it ('should exit 0 if env file matches schema', function() {
+        it('should exit 0 if env file matches schema', function () {
             process.chdir('tests/fixtures/validate')
             program.parse(['validate', 'good.env'], {from: 'user'});
 
-            expect(process.exitCode).to.equal(0);
+            expect(process.exitCode).toEqual(0);
         })
     });
 
-    describe('sync', function() {
-        it ('should output an env file based on the schema', function() {
+    describe('sync', function () {
+        it('should output an env file based on the schema', function () {
             process.chdir('tests/fixtures/sync');
             program.parse(['sync', 'out.env'], {from: "user"});
 
-            expect(fs.existsSync('out.env')).to.be.true;
-            expect(fs.readFileSync('out.env')).to.have.length.greaterThan(0)
+            expect(fs.existsSync('out.env')).toBeTruthy();
+            expect(fs.readFileSync('out.env').length).toBeGreaterThan(0)
 
             // cleanup
             fs.unlinkSync('out.env');
         })
 
-        it ('should update an env if one already exists', function() {
+        it('should update an env if one already exists', function () {
             process.chdir('tests/fixtures/sync');
             fs.writeFileSync('out.env', `
                 ### Comment
@@ -143,10 +136,10 @@ describe('env-tool cli', function () {
             `)
             program.parse(['sync', 'out.env'], {from: "user"});
 
-            expect(fs.existsSync('out.env')).to.be.true;
-            expect(fs.readFileSync('out.env')).to.have.length.greaterThan(0)
-            expect(fs.readFileSync('out.env').toString()).to.contain('TEST_ENV_VAR=not_default_value')
-            expect(fs.readFileSync('out.env').toString()).to.contain('TEST_VAR_2=default_value')
+            expect(fs.existsSync('out.env')).toBeTruthy()
+            expect(fs.readFileSync('out.env').length).toBeGreaterThan(0)
+            expect(fs.readFileSync('out.env').toString()).toContain('TEST_ENV_VAR=not_default_value')
+            expect(fs.readFileSync('out.env').toString()).toContain('TEST_VAR_2=default_value')
 
             // cleanup
             fs.unlinkSync('out.env');
