@@ -7,7 +7,7 @@
     "build": "tsc --project ./",
     "env": "tsc && node dist/index.js --",
     "test": "jest",
-    "test:ci": "jest --reporters='jest-junit'"
+    "test:ci": "jest --config=jest.config.ci.ts"
   },
   "bin": {
     "env-tool": "dist/index.js"
