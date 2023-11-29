@@ -29,7 +29,6 @@ describe('env-tool cli', function () {
             process.chdir('tests/fixtures/init')
             program.parse(['init', 'src'], {from: 'user'})
             expect(fs.existsSync(schemaTempFile)).toBeTruthy()
-            expect(true).toEqual(false)
 
             try {
                 fs.unlinkSync(schemaTempFile);
