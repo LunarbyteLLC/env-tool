@@ -14,6 +14,11 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '16'
+          registry-url: 'https://registry.npmjs.org'
+          always-auth: true
+          scope: '@lunarbyte'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Install Dependencies
         run: npm install
@@ -24,5 +29,3 @@ jobs:
       - name: Publish to GitHub Packages
         run:
           npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
