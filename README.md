@@ -2,50 +2,46 @@
 
 ## Installation
 
-Generate a new github personal access token
-https://github.com/settings/tokens/new?scopes=read:packages&description=npm-package-manager
-
-
-Edit `.npmrc` in your home directory and add the following lines. 
-Replace `<your_github_personal_token>` with the token you just generated.
-```text
-@lunarbytellc:registry=https://npm.pkg.github.com/
-//npm.pkg.github.com/:_authToken=<your_github_personal_token>
+### In your current project
+```shell
+npm install @lunarbyte/env-tool
 ```
 
-Finally run `npm install -g @lunarbytellc/env-tool`. 
-
-Run it to see the help description.
+### Global install
 ```shell
-env-tool
+npm install -g @lunarbyte/env-tool
 ```
 
 ## Usage
 
-### Audit
-
-List usages of `process.env` variables in your code. Does not write any files.
-Use this command to check for undocumented references to  `process.env` variables.
-You might run this in your CI system to prevent deploying a new feature and forgetting to set up some API_KEY env variable. 
-
-
-```shell
-env-tool audit example/
-```
 ### Init
 
-`init` will extract all the usages of `process.env` variables and create a schema file. 
-The schema file is used for validating your `.env` file and syncing it with future changes. 
+`init` will extract all the usages of `process.env` variables and create a schema file.
+The schema file is used for validating your `.env` file and syncing it with future changes.
 
 ```shell
 # create a schema by scanning the example/ directory
 env-tool init example/
 ```
 
+
+### Audit
+
+List usages of `process.env` variables in your code. Does not write any files.
+Use this command to check for undocumented references to  `process.env` variables.
+You might run this in your CI system to prevent merging code that introduces a new env 
+variable without documenting it. 
+
+```shell
+env-tool audit example/
+```
+
 ### Validate
 
 Compare your current `.env` file against the schema. Checks for undefined variables that
-are required, or variables with no value that are required.
+are required, or variables with no value that are required. You might run this during your
+deployment process to prevent deploying code that requires some new environment variable
+which has not been configured. 
 
 ```shell
 env-tool validate .env

@@ -1,6 +1,6 @@
 {
   "name": "@lunarbyte/env-tool",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Tools to validate, generate, and update env files",
   "main": "index.js",
   "scripts": {
