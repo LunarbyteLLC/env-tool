@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 interface PackageJson {
     name?: string;
@@ -12,7 +11,7 @@ interface PackageJson {
 /**
  * Display help information
  */
-function showHelp() {
+export function showHelp() {
     console.log(`
 env-tool-init
 
@@ -34,27 +33,71 @@ This script will:
 }
 
 /**
- * Detects the most likely source directory in the project
- * @returns The detected source directory path
+ * Find potential source directories in the project
+ * @returns Array of detected source directories
  */
-function detectSourceDirectory(): string {
+export function findSourceDirs(): string[] {
     const possibleSrcDirs = ['src', 'app', 'lib', 'source'];
+    const foundDirs: string[] = [];
     
     for (const dir of possibleSrcDirs) {
         if (fs.existsSync(path.resolve(process.cwd(), dir))) {
-            return `${dir}/`;
+            foundDirs.push(dir);
         }
     }
     
-    // Default to current directory if no standard directory is found
-    return './';
+    return foundDirs.length > 0 ? foundDirs : ['./'];
 }
 
 /**
- * Updates a project's package.json with env-tool scripts
+ * Detects the most likely source directory in the project
+ * @returns The detected source directory path
+ */
+export function detectSourceDirectory(): string {
+    const dirs = findSourceDirs();
+    const sourceDir = dirs[0];
+    return sourceDir.endsWith('/') ? sourceDir : `${sourceDir}/`;
+}
+
+/**
+ * Updates a package.json object with env-tool scripts
+ * @param packageJson The package.json object to update
+ * @param sourceDirs Array of source directories to target
+ * @returns The updated package.json object
+ */
+export function updatePackageJson(packageJson: PackageJson, sourceDirs: string[]): PackageJson {
+    // Initialize scripts object if it doesn't exist
+    if (!packageJson.scripts) {
+        packageJson.scripts = {};
+    }
+    
+    const sourceDir = sourceDirs[0];
+    const formattedSourceDir = sourceDir.endsWith('/') ? sourceDir : `${sourceDir}/`;
+    
+    // Add env-tool scripts with the specified source directory
+    const scripts = {
+        'env-tool': 'env-tool',
+        'env:init': `env-tool init ${formattedSourceDir}`,
+        'env:audit': `env-tool audit ${formattedSourceDir}`,
+        'env:validate': 'env-tool validate .env',
+        'env:sync': 'env-tool sync .env'
+    };
+    
+    // Merge scripts with existing ones
+    Object.entries(scripts).forEach(([key, value]) => {
+        if (!packageJson.scripts![key]) {
+            packageJson.scripts![key] = value;
+        }
+    });
+    
+    return packageJson;
+}
+
+/**
+ * Updates the project's package.json file with env-tool scripts
  * @param sourceDir The directory to target for env-tool operations
  */
-function updatePackageJson(sourceDir: string) {
+export function updatePackageJsonFile(sourceDir: string) {
     const packageJsonPath = path.resolve(process.cwd(), 'package.json');
     
     if (!fs.existsSync(packageJsonPath)) {
@@ -71,34 +114,55 @@ function updatePackageJson(sourceDir: string) {
         process.exit(1);
     }
     
-    // Initialize scripts object if it doesn't exist
-    if (!packageJson.scripts) {
-        packageJson.scripts = {};
-    }
-    
-    // Add env-tool scripts with the specified source directory
-    const scripts = {
-        'env-tool': 'env-tool',
-        'env:init': `env-tool init ${sourceDir}`,
-        'env:audit': `env-tool audit ${sourceDir}`,
-        'env:validate': 'env-tool validate .env',
-        'env:sync': 'env-tool sync .env'
-    };
-    
-    // Merge scripts with existing ones
-    Object.entries(scripts).forEach(([key, value]) => {
-        if (!packageJson.scripts![key]) {
-            packageJson.scripts![key] = value;
-        }
-    });
+    const updatedPackageJson = updatePackageJson(packageJson, [sourceDir]);
     
     // Write updated package.json
     fs.writeFileSync(
         packageJsonPath,
-        JSON.stringify(packageJson, null, 2) + '\n'
+        JSON.stringify(updatedPackageJson, null, 2) + '\n'
     );
     
     console.log('✅ Added env-tool scripts to package.json');
+}
+
+/**
+ * Creates an initial empty schema file in the project
+ */
+export function createInitialSchema() {
+    const schemaPath = path.resolve(process.cwd(), 'envconfig.json');
+    
+    // Create an empty schema file
+    fs.writeFileSync(
+        schemaPath,
+        JSON.stringify({}, null, 2) + '\n'
+    );
+    
+    console.log('✅ Created initial envconfig.json schema file');
+}
+
+/**
+ * Runs the installation process with an optional specified source directory
+ * @param specifiedSourceDir Optional source directory to use
+ */
+export function runInstallation(specifiedSourceDir?: string) {
+    let sourceDir: string;
+    
+    if (specifiedSourceDir) {
+        sourceDir = specifiedSourceDir;
+        if (!sourceDir.endsWith('/')) {
+            sourceDir += '/';
+        }
+        console.log(`Using specified source directory: ${sourceDir}`);
+    } else {
+        sourceDir = detectSourceDirectory();
+        console.log(`Auto-detected source directory: ${sourceDir}`);
+    }
+    
+    // Update package.json with env-tool scripts
+    updatePackageJsonFile(sourceDir);
+    
+    // Create initial schema file
+    createInitialSchema();
     
     console.log(`
 Installation complete! Here's how to get started:
@@ -118,27 +182,21 @@ scripts in package.json.
 }
 
 // Process command-line arguments
-const args = process.argv.slice(2);
+if (require.main === module) {
+    const args = process.argv.slice(2);
 
-if (args.includes('--help') || args.includes('-h')) {
-    showHelp();
-} else {
-    // Check for directory flag
-    let sourceDir = '';
-    const dirIndex = args.findIndex(arg => arg === '--dir' || arg === '-d');
-    
-    if (dirIndex !== -1 && args.length > dirIndex + 1) {
-        sourceDir = args[dirIndex + 1];
-        // Ensure directory ends with a slash
-        if (!sourceDir.endsWith('/')) {
-            sourceDir += '/';
-        }
-        console.log(`Using specified source directory: ${sourceDir}`);
+    if (args.includes('--help') || args.includes('-h')) {
+        showHelp();
     } else {
-        sourceDir = detectSourceDirectory();
-        console.log(`Auto-detected source directory: ${sourceDir}`);
+        // Check for directory flag
+        let sourceDir = '';
+        const dirIndex = args.findIndex(arg => arg === '--dir' || arg === '-d');
+        
+        if (dirIndex !== -1 && args.length > dirIndex + 1) {
+            sourceDir = args[dirIndex + 1];
+            runInstallation(sourceDir);
+        } else {
+            runInstallation();
+        }
     }
-    
-    // Run the installation with the specified or detected source directory
-    updatePackageJson(sourceDir);
 } 
