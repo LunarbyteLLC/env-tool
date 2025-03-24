@@ -7,7 +7,12 @@
     "build": "tsc --project ./",
     "env": "tsc && node dist/index.js --",
     "test": "jest",
-    "test:ci": "jest --config=jest.ci.config.ts"
+    "test:ci": "jest --config=jest.ci.config.ts",
+    "env-tool": "node dist/index.js",
+    "env:init": "env-tool init src/",
+    "env:audit": "env-tool audit src/",
+    "env:validate": "env-tool validate .env",
+    "env:sync": "env-tool sync .env"
   },
   "files": [
     "LICENSE",
@@ -17,7 +22,8 @@
     "package-lock.json"
   ],
   "bin": {
-    "env-tool": "dist/index.js"
+    "env-tool": "dist/index.js",
+    "env-tool-init": "dist/install.js"
   },
   "author": "Ben Daschel",
   "license": "ISC",
@@ -39,5 +45,13 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  }
+  },
+  "keywords": [
+    "environment",
+    "env",
+    "dotenv",
+    "variables",
+    "typescript",
+    "javascript"
+  ]
 }
