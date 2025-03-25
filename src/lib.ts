@@ -9,8 +9,9 @@ export interface EnvSchema {
         default: string;
     }
 }
-export function scanVars(dir: string, useGitTracking: boolean = true) {
-    const envVars = new Set<string>();
+export function scanVars(dir: string, useGit: boolean = true): string[] {
+    const gitAvailable = useGit && isGitAvailable(dir);
+    const vars = new Set<string>();
     
     // Common directories and files to ignore
     const ignorePatterns = [
@@ -23,10 +24,6 @@ export function scanVars(dir: string, useGitTracking: boolean = true) {
         '.cache',
         '.DS_Store'
     ];
-
-    // Check if we can use Git for tracking files
-    const gitAvailable = useGitTracking && isGitAvailable(dir);
-    const gitTrackedFiles = gitAvailable ? getGitTrackedFiles(dir) : new Set<string>();
 
     function shouldIgnore(pathName: string): boolean {
         const baseName = path.basename(pathName);
@@ -49,7 +46,7 @@ export function scanVars(dir: string, useGitTracking: boolean = true) {
                 }
 
                 // If Git tracking is enabled and file is not tracked, skip it
-                if (gitAvailable && !gitTrackedFiles.has(path.resolve(fullPath))) {
+                if (gitAvailable && isGitIgnored(fullPath, dir)) {
                     return;
                 }
                 
@@ -57,7 +54,7 @@ export function scanVars(dir: string, useGitTracking: boolean = true) {
 
                 const matches = content.matchAll(/process\.env\.(\w+)/gm)
                 for (const match of matches) {
-                    envVars.add(match[1])
+                    vars.add(match[1])
                 }
             }
         });
@@ -65,7 +62,7 @@ export function scanVars(dir: string, useGitTracking: boolean = true) {
 
     traverseDir(dir);
 
-    return Array.from(envVars);
+    return Array.from(vars);
 }
 
 /**
@@ -185,20 +182,20 @@ export function isGitAvailable(dir: string): boolean {
 }
 
 /**
- * Get a list of all files tracked by Git
+ * Check if a file is ignored by Git
+ * @param filePath Path to the file to check
+ * @param dir Directory containing the Git repository
+ * @returns true if the file is ignored by Git, false otherwise
  */
-export function getGitTrackedFiles(dir: string): Set<string> {
+function isGitIgnored(filePath: string, dir: string): boolean {
     try {
-        const output = execSync('git ls-files', {
+        execSync(`git check-ignore "${filePath}"`, {
             cwd: dir,
-            encoding: 'utf-8'
+            stdio: 'ignore'
         });
-        
-        const files = output.split('\n').filter(Boolean);
-        const absolutePaths = files.map(file => path.resolve(dir, file));
-        return new Set(absolutePaths);
+        return true;
     } catch (error) {
-        console.warn('Failed to get Git tracked files, falling back to directory scanning');
-        return new Set();
+        // If the command fails (returns non-zero), the file is not ignored
+        return false;
     }
 }

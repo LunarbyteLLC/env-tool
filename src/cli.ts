@@ -3,6 +3,8 @@ import {audit, initSchema, loadSchema, scanVars, syncEnvFile, validate} from "./
 import process from "process";
 import fs from "fs";
 import {parse} from "dotenv";
+import {updatePackageJson, detectSourceDirectory} from "./install";
+import path from "path";
 
 export function createCli() {
 
@@ -16,20 +18,68 @@ export function createCli() {
         .version('1.0.4');
 
     program.command('init')
-        .arguments('<dir>')
-        .description('Scan project files and create an environment schema')
+        .argument('[dir]', 'Source directory to scan (will auto-detect if not specified)')
+        .description('Initialize env-tool in your project')
         .option('-f, --force', 'Overwrite existing schema file', false)
         .option('--no-git', 'Disable Git tracking for file scanning')
+        .option('--no-scripts', 'Skip adding scripts to package.json')
         .action((dir, options) => {
+            // Auto-detect source directory if not specified
+            const sourceDir = dir ? (dir.endsWith('/') ? dir : `${dir}/`) : detectSourceDirectory();
+            console.log(`Using source directory: ${sourceDir}`);
+
+            // Update package.json with env-tool scripts if not disabled
+            if (options.scripts) {
+                const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+                if (!fs.existsSync(packageJsonPath)) {
+                    console.error('No package.json found in the current directory.');
+                    process.exitCode = 1;
+                    return;
+                }
+
+                try {
+                    const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
+                    const packageJson = JSON.parse(packageJsonContent);
+                    const updatedPackageJson = updatePackageJson(packageJson, [sourceDir]);
+                    fs.writeFileSync(
+                        packageJsonPath,
+                        JSON.stringify(updatedPackageJson, null, 2) + '\n'
+                    );
+                    console.log('✅ Added env-tool scripts to package.json');
+                } catch (error) {
+                    console.error('Failed to update package.json:', error);
+                    process.exitCode = 1;
+                    return;
+                }
+            }
+
+            // Create or update schema file
             if (fs.existsSync(DEFAULT_SCHEMA_FILE) && !options.force) {
                 process.exitCode = 1;
                 console.warn(`${DEFAULT_SCHEMA_FILE} already exists. Use -f to overwrite if you want to start over.`)
                 return;
             }
-            const vars = scanVars(dir, options.git);
+
+            const vars = scanVars(sourceDir, options.git);
             const out = initSchema(vars);
             fs.writeFileSync(DEFAULT_SCHEMA_FILE, JSON.stringify(out, null, 4))
-            console.log(`Created schema file at ${DEFAULT_SCHEMA_FILE}`);
+            console.log(`✅ Created schema file at ${DEFAULT_SCHEMA_FILE}`);
+
+            // Print next steps
+            console.log(`
+                        Getting Started:
+
+                        1. Review and update the generated ${DEFAULT_SCHEMA_FILE} file:
+                        - Set appropriate default values
+                        - Add meaningful comments
+                        - Set required flags according to your needs
+
+                        2. Sync your .env file with the schema:
+                        npm run env:sync
+
+                        3. Validate your .env file:
+                        npm run env:validate
+                        `);
         })
 
     program.command('audit')

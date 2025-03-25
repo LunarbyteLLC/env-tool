@@ -14,47 +14,35 @@ A TypeScript/JavaScript environment variable management tool that helps ensure c
 
 ### Project Installation
 
-#### Option 1: Quick Setup
-
 The quickest way to add env-tool to your project:
 
 ```shell
 # Install the package
 npm install --save-dev @lunarbyte/env-tool
 
-# Run the setup script to add scripts to your package.json
-npx env-tool-init
+# Initialize env-tool in your project
+npx env-tool init <directory>/
 ```
 
 This will automatically:
 1. Install the package in your project
 2. Add the necessary scripts to your package.json
-3. Detect your source directory
+3. Create an initial schema file
+4. Detect and scan your source directory for environment variables
 
-You can also specify a custom source directory:
-
+You can customize the initialization with these options:
 ```shell
-npx env-tool-init --dir path/to/source
-```
+# Specify a custom source directory
+env-tool init path/to/source
 
-#### Option 2: Manual Setup
+# Skip Git ignore rules
+env-tool init <directory>/ --no-git
 
-1. Add the env-tool to your project:
+# Skip adding scripts to package.json
+env-tool init <directory>/ --no-scripts
 
-```shell
-npm install --save-dev @lunarbyte/env-tool
-```
-
-2. Add scripts to your package.json:
-
-```json
-"scripts": {
-  "env-tool": "env-tool",
-  "env:init": "env-tool init <directory>",
-  "env:audit": "env-tool audit <directory>",
-  "env:validate": "env-tool validate .env",
-  "env:sync": "env-tool sync .env"
-}
+# Force overwrite existing schema
+env-tool init <directory>/ --force
 ```
 
 ### Global Installation
@@ -67,28 +55,25 @@ npm install -g @lunarbyte/env-tool
 
 ## Getting Started
 
-1. Initialize the environment schema:
+After installation, env-tool will have:
+1. Created an `envconfig.json` file with all detected environment variables
+2. Added convenient npm scripts to your package.json
 
+Next steps:
+
+1. Review and update the generated schema:
+   - Set appropriate default values
+   - Add meaningful comments
+   - Set required flags according to your needs
+
+2. Sync your .env file with the schema:
 ```shell
-# Using project installation
-npm run env:init
-
-# Using global installation
-env-tool init src/
+npm run env:sync
 ```
 
-This will create an `envconfig.json` file in your project root with all the `process.env` variables found in your code.
-
-2. Update the generated schema with appropriate comments, required flags, and default values.
-
-3. Sync your `.env` file with the schema:
-
+3. Validate your .env file:
 ```shell
-# Using project installation
-npm run env:sync
-
-# Using global installation
-env-tool sync .env
+npm run env:validate
 ```
 
 ## Schema File Example
