@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
 
 export interface EnvSchema {
     [key: string]: {
@@ -8,20 +9,52 @@ export interface EnvSchema {
         default: string;
     }
 }
-export function scanVars(dir: string) {
-    const envVars = new Set<string>();
+export function scanVars(dir: string, useGit: boolean = true): string[] {
+    const gitAvailable = useGit && isGitAvailable(dir);
+    const vars = new Set<string>();
+    
+    // Common directories and files to ignore
+    const ignorePatterns = [
+        'node_modules',
+        '.git',
+        'dist',
+        'build',
+        'coverage',
+        '.next',
+        '.cache',
+        '.DS_Store'
+    ];
+
+    function shouldIgnore(pathName: string): boolean {
+        const baseName = path.basename(pathName);
+        return ignorePatterns.includes(baseName);
+    }
 
     function traverseDir(dir: string) {
         fs.readdirSync(dir).forEach(file => {
             let fullPath = path.join(dir, file);
+            
             if (fs.lstatSync(fullPath).isDirectory()) {
-                traverseDir(fullPath);
+                // Skip ignored directories
+                if (!shouldIgnore(fullPath)) {
+                    traverseDir(fullPath);
+                }
             } else {
+                // Skip non-TypeScript/JavaScript files
+                if (!/\.(ts|tsx|js|jsx)$/.test(fullPath)) {
+                    return;
+                }
+
+                // If Git tracking is enabled and file is not tracked, skip it
+                if (gitAvailable && isGitIgnored(fullPath, dir)) {
+                    return;
+                }
+                
                 const content = fs.readFileSync(fullPath).toString('utf-8');
 
                 const matches = content.matchAll(/process\.env\.(\w+)/gm)
                 for (const match of matches) {
-                    envVars.add(match[1])
+                    vars.add(match[1])
                 }
             }
         });
@@ -29,13 +62,28 @@ export function scanVars(dir: string) {
 
     traverseDir(dir);
 
-    return Array.from(envVars);
+    return Array.from(vars);
 }
 
+/**
+ * Load the environment schema from the specified path
+ * @param path Path to the schema file
+ * @returns The parsed schema
+ */
 export function loadSchema(path: string): EnvSchema {
-    const contents = fs.readFileSync(path).toString('utf-8');
-    const config = JSON.parse(contents);
-    return config;
+    try {
+        const contents = fs.readFileSync(path).toString('utf-8');
+        const config = JSON.parse(contents);
+        return config;
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            console.error(`Schema file not found: ${path}`);
+            console.error(`Run 'env-tool init <directory>' to create a schema first.`);
+        } else {
+            console.error(`Error loading schema: ${error.message}`);
+        }
+        process.exit(1);
+    }
 }
 
 export function audit(vars: string[], schema: EnvSchema) {
@@ -116,4 +164,38 @@ export function syncEnvFile(schema: EnvSchema, currentValues: any) {
     }
     const contents = out.join('\n');
     return contents;
+}
+
+/**
+ * Check if Git is available in the current directory
+ */
+export function isGitAvailable(dir: string): boolean {
+    try {
+        execSync('git rev-parse --is-inside-work-tree', {
+            cwd: dir,
+            stdio: 'ignore'
+        });
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Check if a file is ignored by Git
+ * @param filePath Path to the file to check
+ * @param dir Directory containing the Git repository
+ * @returns true if the file is ignored by Git, false otherwise
+ */
+function isGitIgnored(filePath: string, dir: string): boolean {
+    try {
+        execSync(`git check-ignore "${filePath}"`, {
+            cwd: dir,
+            stdio: 'ignore'
+        });
+        return true;
+    } catch (error) {
+        // If the command fails (returns non-zero), the file is not ignored
+        return false;
+    }
 }
