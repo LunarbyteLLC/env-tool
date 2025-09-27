@@ -1,13 +1,16 @@
 import fs from "fs";
 import path from "path";
 import process from "process";
+import { execSync } from "child_process";
 import { initSchema, scanVars } from "../lib";
 import { detectSourceDirectory, updatePackageJson } from "../install";
+import { syncCommand } from "./sync";
 
 export interface InitOptions {
   force: boolean;
   git: boolean;
   scripts: boolean;
+  withDotenvx?: boolean;
 }
 
 // Kept here in case future reuse is needed
@@ -58,6 +61,37 @@ export function initCommand(
   const out = initSchema(vars);
   fs.writeFileSync(schemaFile, JSON.stringify(out, null, 4));
   console.log(`✅ Created schema file at ${schemaFile}`);
+
+  // Optional: install and set up dotenvx environments
+  if (options.withDotenvx) {
+    try {
+      console.log('Installing @dotenvx/dotenvx...');
+      execSync('npm install @dotenvx/dotenvx', { stdio: 'inherit' });
+      console.log('✅ Installed @dotenvx/dotenvx');
+    } catch (e) {
+      console.warn('⚠️ Failed to install @dotenvx/dotenvx. You can install it manually with:\n  npm install @dotenvx/dotenvx');
+      process.exitCode = process.exitCode ?? 0; // do not exit, continue setup
+    }
+
+    const envRoot = path.resolve(process.cwd(), 'env');
+    const devDir = path.join(envRoot, 'dev');
+    const prodDir = path.join(envRoot, 'prod');
+
+    fs.mkdirSync(devDir, { recursive: true });
+    fs.mkdirSync(prodDir, { recursive: true });
+
+    const devEnvFile = path.join(devDir, '.env');
+    const prodEnvFile = path.join(prodDir, '.env');
+
+    if (!fs.existsSync(devEnvFile)) fs.writeFileSync(devEnvFile, '');
+    if (!fs.existsSync(prodEnvFile)) fs.writeFileSync(prodEnvFile, '');
+
+    // Populate files according to schema
+    syncCommand(devEnvFile, schemaFile);
+    syncCommand(prodEnvFile, schemaFile);
+
+    console.log('✅ Created env/dev/.env and env/prod/.env and synced keys from schema');
+  }
 
   // Print next steps
   console.log(`

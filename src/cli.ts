@@ -21,6 +21,7 @@ export function createCli() {
         .option('-f, --force', 'Overwrite existing schema file', false)
         .option('--no-git', 'Disable Git tracking for file scanning')
         .option('--no-scripts', 'Skip adding scripts to package.json')
+        .option('--with-dotenvx', 'install and configure dotenvx for secrets management')
         .action((dir: string | undefined, options: InitOptions) => {
             initCommand(dir, options, DEFAULT_SCHEMA_FILE);
         })
