@@ -57,20 +57,16 @@ describe('env-tool init --with-dotenvx (e2e-ish)', () => {
       ].join('\n')
     );
 
-    // Reset calls on mocked execSync before each test
     (child_process.execSync as unknown as jest.Mock).mockClear();
 
     program = createCli();
   });
 
   afterEach(() => {
-    // Cleanup and restore
     try {
       process.chdir(originalCwd);
     } catch {}
     try {
-      // Recursively delete the temp directory
-      // Node 14+ supports recursive rm
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {}
   });
