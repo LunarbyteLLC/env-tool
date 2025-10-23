@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
 import { initCommand, InitOptions } from './commands/init';
 import { auditCommand, AuditOptions } from './commands/audit';
 import { validateCommand } from './commands/validate';
@@ -9,11 +11,25 @@ export function createCli() {
     const DEFAULT_SCHEMA_FILE = './envconfig.json';
 
     const program = new Command();
-    
+
+    // Read version from the package.json located at the package root
+    let version = '0.0.0';
+    try {
+        const pkgPath = path.resolve(__dirname, '../package.json');
+        const pkgRaw = fs.readFileSync(pkgPath, 'utf-8');
+        const pkg = JSON.parse(pkgRaw);
+        if (pkg && typeof pkg.version === 'string') {
+            version = pkg.version;
+        }
+    } catch (e) {
+        // Fallback if package.json cannot be read for any reason
+        version = '0.0.0';
+    }
+
     program
         .name('env-tool')
         .description('A tool to manage environment variables in TypeScript/JavaScript projects')
-        .version('1.0.4');
+        .version(version);
 
     program.command('init')
         .argument('[dir]', 'Source directory to scan (will auto-detect if not specified)')

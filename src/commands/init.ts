@@ -70,25 +70,45 @@ export function initCommand(
       console.log('✅ Installed @dotenvx/dotenvx');
     } catch (e) {
       console.warn('⚠️ Failed to install @dotenvx/dotenvx. You can install it manually with:\n  npm install @dotenvx/dotenvx');
-      process.exitCode = process.exitCode ?? 0; // do not exit, continue setup
     }
 
     const envRoot = path.resolve(process.cwd(), 'env');
-    const devDir = path.join(envRoot, 'dev');
-    const prodDir = path.join(envRoot, 'prod');
+    const envs = ['dev', 'prod'] as const;
 
-    fs.mkdirSync(devDir, { recursive: true });
-    fs.mkdirSync(prodDir, { recursive: true });
+    // Create env directories, ensure .env files, sync based on schema, and initialize dotenvx keys
+    for (const name of envs) {
+      const dirPath = path.join(envRoot, name);
+      fs.mkdirSync(dirPath, { recursive: true });
+      const envFile = path.join(dirPath, '.env');
+      if (!fs.existsSync(envFile)) fs.writeFileSync(envFile, '');
+      // Populate file according to schema
+      syncCommand(envFile, schemaFile);
+      try {
+      // Initialize dotenvx key by setting a dummy encrypted value
+        execSync('dotenvx set HELLO world', { stdio: 'ignore', cwd: dirPath });
+      } catch (e) {
+        console.warn(`⚠️ Failed to initialize dotenvx key file in ${dirPath}. You can do it manually with:\n  (cd ${path.relative(process.cwd(), dirPath)} && dotenvx set HELLO world)`);
+        process.exitCode = process.exitCode ?? 0; // do not exit, continue setup
+      }
+    }
+    console.log('✅ Initialized dotenvx key files in env/dev and env/prod');
 
-    const devEnvFile = path.join(devDir, '.env');
-    const prodEnvFile = path.join(prodDir, '.env');
-
-    if (!fs.existsSync(devEnvFile)) fs.writeFileSync(devEnvFile, '');
-    if (!fs.existsSync(prodEnvFile)) fs.writeFileSync(prodEnvFile, '');
-
-    // Populate files according to schema
-    syncCommand(devEnvFile, schemaFile);
-    syncCommand(prodEnvFile, schemaFile);
+    try {
+      const gitignorePath = path.resolve(process.cwd(), '.gitignore');
+      const ignoreLine = '**/.env.keys';
+      let current = '';
+      if (fs.existsSync(gitignorePath)) {
+        current = fs.readFileSync(gitignorePath, 'utf-8');
+      }
+      if (!current.split(/\r?\n/).includes(ignoreLine)) {
+        const prefix = current && !current.endsWith('\n') ? '\n' : '';
+        fs.writeFileSync(gitignorePath, current + prefix + ignoreLine + '\n');
+        console.log('✅ Updated .gitignore to ignore **/.env.keys');
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not update .gitignore to ignore **/.env.keys');
+      process.exitCode = process.exitCode ?? 0; // non-fatal
+    }
 
     console.log('✅ Created env/dev/.env and env/prod/.env and synced keys from schema');
   }
