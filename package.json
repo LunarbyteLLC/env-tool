@@ -1,10 +1,11 @@
 {
   "name": "@lunarbyte/env-tool",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Tools to validate, generate, and update env files",
   "main": "index.js",
   "scripts": {
     "build": "tsc --project ./",
+    "prepare": "npm run build",
     "env": "tsc && node dist/index.js --",
     "test": "jest",
     "test:ci": "jest --config=jest.ci.config.ts",
@@ -12,7 +13,9 @@
     "env:init": "env-tool init src/",
     "env:audit": "env-tool audit src/",
     "env:validate": "env-tool validate .env",
-    "env:sync": "env-tool sync .env"
+    "env:sync": "env-tool sync .env",
+    "link:local": "npm link",
+    "demo:init": "rm -rf demo && mkdir demo && cd demo && npm init -y && npm link @lunarbyte/env-tool && npx env-tool init --with-dotenvx"
   },
   "files": [
     "LICENSE",
@@ -25,12 +28,13 @@
     "env-tool": "dist/index.js"
   },
   "author": "Ben Daschel",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^1.36.0",
     "@types/chai": "^4.3.11",
     "@types/jest": "^29.5.10",
     "@types/node": "^20.9.0",
