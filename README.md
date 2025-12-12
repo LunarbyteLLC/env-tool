@@ -1,186 +1,235 @@
-# Envtool
+# @lunarbyte/env-tool
 
-A TypeScript/JavaScript environment variable management tool that helps ensure consistent usage of environment variables across different environments in your projects.
+Stop managing environment variables manually. This CLI scans your codebase for `process.env` usages, generates a schema, and validates your `.env` files—with optional encrypted secrets via [dotenvx](https://github.com/dotenvx/dotenvx).
 
-## Features
+## Quick Start
 
-- Scan your codebase for all `process.env` usages
-- Generate and maintain an environment schema file (`envconfig.json`)
-- Validate your `.env` files against the schema
-- Sync your `.env` files with new environment variables
-- Audit your codebase for undocumented environment variables
-
-## Installation
-
-### Project Installation
-
-The quickest way to add env-tool to your project:
-
-```shell
-# Install the package
-npm install --save-dev @lunarbyte/env-tool
-
-# Initialize env-tool in your project
-npx env-tool init <directory>/
-```
-
-This will automatically:
-1. Install the package in your project
-2. Add the necessary scripts to your package.json
-3. Create an initial schema file
-4. Detect and scan your source directory for environment variables
-
-You can customize the initialization with these options:
-```shell
-# Specify a custom source directory
-env-tool init path/to/source
-
-# Skip Git ignore rules
-env-tool init <directory>/ --no-git
-
-# Skip adding scripts to package.json
-env-tool init <directory>/ --no-scripts
-
-# Force overwrite existing schema
-env-tool init <directory>/ --force
-```
-
-### Global Installation
-
-If you prefer a global installation:
-
-```shell
+```bash
 npm install -g @lunarbyte/env-tool
+cd your-project
+env-tool init src/
 ```
 
-## Getting Started
+That's it. You now have an `envconfig.json` schema and npm scripts ready to go.
 
-After installation, env-tool will have:
-1. Created an `envconfig.json` file with all detected environment variables
-2. Added convenient npm scripts to your package.json
+---
 
-Next steps:
+## Commands
 
-1. Review and update the generated schema:
-   - Set appropriate default values
-   - Add meaningful comments
-   - Set required flags according to your needs
+| Command | What it does |
+|---------|--------------|
+| `env-tool init <dir>` | Scan source code, create `envconfig.json`, add npm scripts |
+| `env-tool audit <dir>` | Find `process.env` vars missing from schema (CI blocker) |
+| `env-tool validate <envfile>` | Check `.env` file has all required vars |
+| `env-tool sync <envfile>` | Update `.env` with new vars from schema |
 
-2. Sync your .env file with the schema:
-```shell
-npm run env:sync
+### Init Options
+
+```bash
+env-tool init src/              # Basic setup
+env-tool init src/ --with-dotenvx  # + encrypted secrets (recommended)
+env-tool init src/ --force      # Overwrite existing schema
+env-tool init src/ --no-scripts # Skip adding npm scripts
+env-tool init src/ --no-git     # Include untracked files
 ```
 
-3. Validate your .env file:
-```shell
-npm run env:validate
+---
+
+## Encrypted Secrets with dotenvx
+
+For projects where you want to **store encrypted secrets in your repo** (similar to Pulumi config), use:
+
+```bash
+env-tool init src/ --with-dotenvx
 ```
 
-## Schema File Example
+This creates:
+```
+env/
+├── dev/
+│   ├── .env          # Your dev environment variables
+│   └── .env.keys     # Encryption key (auto-gitignored)
+└── prod/
+    ├── .env          # Your prod environment variables  
+    └── .env.keys     # Encryption key (auto-gitignored)
+```
 
-After running the `init` command, an `envconfig.json` file will be created that looks like this:
+### Managing Secrets
+
+```bash
+# Add/update a secret (encrypts automatically)
+cd env/prod
+dotenvx set DATABASE_URL "postgres://user:pass@host:5432/db"
+
+# View decrypted values locally
+dotenvx get DATABASE_URL
+
+# Run your app with decrypted env
+dotenvx run -- node server.js
+```
+
+### Deploying Encrypted Secrets
+
+The `.env` files contain encrypted values safe to commit. On your server:
+
+```bash
+# Set the decryption key as an environment variable
+export DOTENV_PRIVATE_KEY="your-private-key-from-.env.keys"
+
+# Run with decryption
+dotenvx run -- node server.js
+```
+
+---
+
+## CI/CD Integration
+
+### Pre-deploy Validation
+
+Add to your deployment pipeline to catch missing env vars before they cause runtime errors:
+
+```bash
+npm install -g @lunarbyte/env-tool
+env-tool validate .env
+```
+
+Exit code `1` = validation failed. Missing or empty required vars are logged.
+
+### Audit in CI (Block Undocumented Vars)
+
+Prevent merging code that references undocumented environment variables:
+
+```bash
+env-tool audit src/
+```
+
+Exit code `1` = found `process.env.SOMETHING` not in `envconfig.json`.
+
+### Example: GitHub Actions
+
+```yaml
+# .github/workflows/env-check.yml
+name: Environment Check
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install -g @lunarbyte/env-tool
+      - run: env-tool audit src/
+```
+
+### Example: Pre-deploy Script
+
+```bash
+#!/usr/bin/env bash
+set -eo pipefail
+
+ENV=$1
+[[ -z $ENV ]] && echo "Usage: ./pre-deploy.sh <env>" && exit 1
+
+# Validate env before deploying
+npm install -g @lunarbyte/env-tool
+env-tool validate "env/${ENV}/.env"
+
+# Continue with build...
+npm ci && npm run build
+```
+
+---
+
+## Migrating from Manual Env Management
+
+If you're currently SSHing into servers and editing `.env` files with nano, here's how to migrate:
+
+### 1. Initialize env-tool
+
+```bash
+npm install -g @lunarbyte/env-tool
+env-tool init src/ --with-dotenvx
+```
+
+### 2. Copy Current Production Values
+
+```bash
+# SSH to your server, copy current .env contents
+# Then locally:
+cd env/prod
+# Paste values using dotenvx set for each secret:
+dotenvx set DATABASE_URL "your-prod-value"
+dotenvx set API_KEY "your-prod-value"
+# ... repeat for each var
+```
+
+### 3. Commit Encrypted Env Files
+
+```bash
+git add envconfig.json env/
+git commit -m "feat: add env management with encrypted secrets"
+```
+
+### 4. Update Deployment
+
+On your server, set the decryption key once:
+
+```bash
+# Add to server's environment (systemd, docker, etc.)
+DOTENV_PRIVATE_KEY="key-from-env/prod/.env.keys"
+```
+
+Then your deploy just needs:
+
+```bash
+dotenvx run -- node server.js
+# or
+dotenvx run -- npm start
+```
+
+**No more nano.** Update secrets locally, commit, deploy.
+
+---
+
+## Schema File (`envconfig.json`)
 
 ```json
 {
   "PORT": {
     "required": true,
     "default": "3000",
-    "comment": "Application port number"
+    "comment": "Application port"
   },
   "DATABASE_URL": {
     "required": true,
-    "default": "postgres://user:password@localhost:5432/mydb",
-    "comment": "Database connection string"
-  },
-  "NODE_ENV": {
-    "required": true,
-    "default": "development",
-    "comment": "Application environment (development, production, test)"
-  },
-  "API_KEY": {
-    "required": true,
     "default": "",
-    "comment": "External API authentication key"
+    "comment": "Postgres connection string"
   }
 }
 ```
 
-You should review and update this file:
-- Set appropriate default values
-- Add meaningful comments 
-- Set the required flag according to your needs
+- `required: true` → `validate` fails if missing or empty
+- `default` → Used by `sync` when creating new `.env` entries
+- `comment` → Added as `###` comments in generated `.env` files
 
-## Usage
+---
 
-### Init
+## Workflow Summary
 
-Extracts all usages of `process.env` variables and creates a schema file (`envconfig.json`).
-The schema file is used for validating your `.env` file and syncing it with future changes.
+| Scenario | Command |
+|----------|---------|
+| New project setup | `env-tool init src/ --with-dotenvx` |
+| New developer onboarding | `npm run env:sync` |
+| Added new env var to code | `npm run env:init --force` then `npm run env:sync` |
+| Pre-merge CI check | `env-tool audit src/` |
+| Pre-deploy validation | `env-tool validate env/prod/.env` |
+| Update a secret | `cd env/prod && dotenvx set KEY value` |
 
-```shell
-# Using project installation
-npm run env:init
-
-# Using global installation
-env-tool init <directory-to-scan>
-
-# Skip Git tracking (to include untracked files)
-env-tool init <directory-to-scan> --no-git
-```
-
-By default, only files tracked by Git are scanned to avoid including dependency files. Use the `--no-git` flag to scan all files.
-
-### Audit
-
-Lists usages of `process.env` variables in your code that aren't in your schema.
-Use this command to check for undocumented references to `process.env` variables.
-Ideal for CI/CD pipelines to prevent merging code with undocumented environment variables.
-
-```shell
-# Using project installation
-npm run env:audit
-
-# Using global installation
-env-tool audit <directory-to-scan>
-
-# Skip Git tracking
-env-tool audit <directory-to-scan> --no-git
-```
-
-### Validate
-
-Compares your `.env` file against the schema. Checks for undefined or empty variables that are required.
-Useful during deployment to prevent deploying code that requires unconfigured environment variables.
-
-```shell
-# Using project installation
-npm run env:validate
-
-# Using global installation
-env-tool validate .env
-```
-
-### Sync
-
-Creates or updates an env file based on your schema.
-As your project evolves, you can update your `.env` file to include the latest variables.
-This preserves your existing values while adding new variables with their default values.
-
-```shell
-# Using project installation
-npm run env:sync
-
-# Using global installation
-env-tool sync .env
-```
-
-## Best Practices
-
-1. Run `env:init` or `env:audit` in your CI/CD pipeline to catch undocumented environment variables
-2. Run `env:validate` during deployment to ensure all required environment variables are configured
-3. Commit your `envconfig.json` file to your repository
-4. Use `env:sync` when onboarding new developers to generate their initial `.env` file
+---
 
 ## License
 
-ISC
+MIT
