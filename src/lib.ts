@@ -7,6 +7,7 @@ export interface EnvSchema {
         comment?: string;
         required: boolean;
         default: string;
+        encrypted?: boolean;
     }
 }
 export function scanVars(dir: string, useGit: boolean = true): string[] {
@@ -164,6 +165,45 @@ export function syncEnvFile(schema: EnvSchema, currentValues: any) {
     }
     const contents = out.join('\n');
     return contents;
+}
+
+// Matches a DOTENV_PUBLIC_KEY line as written by dotenvx, e.g.:
+//   DOTENV_PUBLIC_KEY="02cd32ae..."
+//   DOTENV_PUBLIC_KEY_PRODUCTION="02cd32ae..."
+const PUBLIC_KEY_LINE_PATTERN = /^DOTENV_PUBLIC_KEY(_[A-Z0-9_]+)?=.*$/;
+
+/**
+ * Extract any dotenvx `DOTENV_PUBLIC_KEY` line(s) from existing env file contents,
+ * so a re-import can carry the existing keypair forward instead of dotenvx
+ * generating a new one (which would orphan the existing .env.keys file).
+ */
+export function extractPublicKeyLines(content: string): string[] {
+    return content
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => PUBLIC_KEY_LINE_PATTERN.test(line));
+}
+
+/**
+ * Build the contents of an imported env file, preserving any existing
+ * dotenvx public key line(s) so re-imports don't rotate the keypair.
+ */
+export function buildImportedEnvContent(values: Record<string, string>, publicKeyLines: string[] = []): string {
+    const lines: string[] = [...publicKeyLines];
+    for (const key in values) {
+        lines.push(`${key}=${values[key]}`);
+    }
+    if (lines.length === 0) {
+        return '';
+    }
+    return lines.join('\n') + '\n';
+}
+
+/**
+ * Determine which of the given keys are flagged for encryption in the schema.
+ */
+export function getKeysToEncrypt(schema: EnvSchema, keys: string[]): string[] {
+    return keys.filter(key => schema[key]?.encrypted === true);
 }
 
 /**

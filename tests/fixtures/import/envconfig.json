@@ -1,0 +1,13 @@
+{
+    "SECRET": {
+        "required": true,
+        "default": "",
+        "comment": "A sensitive value that must be encrypted",
+        "encrypted": true
+    },
+    "PLAIN": {
+        "required": true,
+        "default": "",
+        "comment": "A regular, non-sensitive value"
+    }
+}

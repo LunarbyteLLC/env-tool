@@ -9,6 +9,7 @@ A TypeScript/JavaScript environment variable management tool that helps ensure c
 - Validate your `.env` files against the schema
 - Sync your `.env` files with new environment variables
 - Audit your codebase for undocumented environment variables
+- Import an existing plaintext env file and encrypt selected values with [dotenvx](https://dotenvx.com/)
 
 ## Installation
 
@@ -100,7 +101,8 @@ After running the `init` command, an `envconfig.json` file will be created that 
   "API_KEY": {
     "required": true,
     "default": "",
-    "comment": "External API authentication key"
+    "comment": "External API authentication key",
+    "encrypted": true
   }
 }
 ```
@@ -109,6 +111,7 @@ You should review and update this file:
 - Set appropriate default values
 - Add meaningful comments 
 - Set the required flag according to your needs
+- Set `encrypted: true` on any variable that should be encrypted by `env-tool import` (see [Import](#import) below)
 
 ## Usage
 
@@ -174,12 +177,48 @@ npm run env:sync
 env-tool sync .env
 ```
 
+### Import
+
+Imports an existing plaintext env file, writes it to an output file, and encrypts any values whose
+key is flagged `"encrypted": true` in the schema. Encryption is handled by
+[dotenvx](https://dotenvx.com/) (installed as part of `env-tool init --with-dotenvx`, or manually
+with `npm install @dotenvx/dotenvx`).
+
+Input can come from a file argument or from stdin, and the output file is required:
+
+```shell
+# Import from a file
+env-tool import plaintext.env --output env/prod/.env
+
+# Import from stdin
+cat plaintext.env | env-tool import --output env/prod/.env
+pbpaste | env-tool import --output env/prod/.env
+
+# "-" is also accepted as an explicit alias for stdin
+env-tool import - --output env/prod/.env
+```
+
+Behavior:
+- Every variable found in the input is written to the output file; values are written as plain
+  text unless their key is marked `encrypted: true` in the schema, in which case dotenvx encrypts
+  them in place after writing.
+- If the output file doesn't already have a dotenvx keypair, one is bootstrapped automatically:
+  dotenvx adds a `DOTENV_PUBLIC_KEY` entry to the output file and writes the matching private key
+  to a `.env.keys` file alongside it. **Never commit `.env.keys` to source control** — `env-tool
+  init --with-dotenvx` already adds `**/.env.keys` to `.gitignore` for you.
+- If the output file already has a keypair (e.g. from a previous import), it's reused rather than
+  rotated, so previously distributed `.env.keys` files keep working.
+- Keys not present in the schema are imported as-is (plain text) — add `encrypted: true` to the
+  schema first if a value should be encrypted.
+
 ## Best Practices
 
 1. Run `env:init` or `env:audit` in your CI/CD pipeline to catch undocumented environment variables
 2. Run `env:validate` during deployment to ensure all required environment variables are configured
 3. Commit your `envconfig.json` file to your repository
 4. Use `env:sync` when onboarding new developers to generate their initial `.env` file
+5. Use `env-tool import` when migrating an existing plaintext env file so secrets get encrypted
+   instead of committed in the clear
 
 ## License
 

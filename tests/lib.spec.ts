@@ -1,4 +1,15 @@
-import {audit, generateEnvFile, initSchema, loadSchema, scanVars, syncEnvFile, validate} from "../src/lib";
+import {
+    audit,
+    buildImportedEnvContent,
+    extractPublicKeyLines,
+    generateEnvFile,
+    getKeysToEncrypt,
+    initSchema,
+    loadSchema,
+    scanVars,
+    syncEnvFile,
+    validate
+} from "../src/lib";
 import {expect} from "chai";
 import path from "path";
 
@@ -127,4 +138,54 @@ describe('env checker library', function () {
         expect(newEnv).matches(/^EXISTING_VAR=an_existing_value$/gm);
         expect(newEnv).matches(/^NEW_VAR=a_new_value$/gm);
     })
+
+    it('should extract DOTENV_PUBLIC_KEY lines from existing env file contents', function () {
+        const content = [
+            '#/---[DOTENV_PUBLIC_KEY]---/',
+            'DOTENV_PUBLIC_KEY="02cd32ae35cd7e4f"',
+            '',
+            '# .env',
+            'FOO=encrypted:abc123',
+            'BAR=plain',
+        ].join('\n');
+
+        expect(extractPublicKeyLines(content)).to.deep.equal(['DOTENV_PUBLIC_KEY="02cd32ae35cd7e4f"']);
+    });
+
+    it('should extract named DOTENV_PUBLIC_KEY_<ENV> lines', function () {
+        const content = 'DOTENV_PUBLIC_KEY_PRODUCTION="abc"\nFOO=bar';
+        expect(extractPublicKeyLines(content)).to.deep.equal(['DOTENV_PUBLIC_KEY_PRODUCTION="abc"']);
+    });
+
+    it('should return no public key lines when none are present', function () {
+        expect(extractPublicKeyLines('FOO=bar\nBAZ=qux')).to.deep.equal([]);
+    });
+
+    it('should build imported env contents preserving public key lines', function () {
+        const content = buildImportedEnvContent(
+            {FOO: 'bar', BAZ: 'qux'},
+            ['DOTENV_PUBLIC_KEY="abc"']
+        );
+        expect(content).to.equal('DOTENV_PUBLIC_KEY="abc"\nFOO=bar\nBAZ=qux\n');
+    });
+
+    it('should build imported env contents with no public key lines', function () {
+        const content = buildImportedEnvContent({FOO: 'bar'});
+        expect(content).to.equal('FOO=bar\n');
+    });
+
+    it('should return an empty string when there are no values to import', function () {
+        expect(buildImportedEnvContent({})).to.equal('');
+    });
+
+    it('should determine which keys are flagged for encryption in the schema', function () {
+        const schema = {
+            SECRET: {required: true, default: '', encrypted: true},
+            PLAIN: {required: true, default: ''},
+            NOT_IMPORTED: {required: true, default: '', encrypted: true},
+        };
+
+        const keysToEncrypt = getKeysToEncrypt(schema, ['SECRET', 'PLAIN']);
+        expect(keysToEncrypt).to.deep.equal(['SECRET']);
+    });
 })

@@ -288,5 +288,78 @@ describe('env-tool cli', function () {
             expect(envCall[1]).toContain('TEST_VAR_2=default_value');
         });
     });
+
+    describe('import', function () {
+        beforeEach(() => {
+            (fs.readFileSync as jest.Mock).mockImplementation((filePath) => {
+                if (String(filePath).includes('envconfig.json')) {
+                    return JSON.stringify({
+                        SECRET: {
+                            required: true,
+                            default: '',
+                            comment: 'A secret value',
+                            encrypted: true
+                        },
+                        PLAIN: {
+                            required: true,
+                            default: '',
+                            comment: 'A plain value'
+                        }
+                    });
+                }
+                if (String(filePath).includes('input.env')) {
+                    return 'PLAIN=hello\n';
+                }
+                return "";
+            });
+            (fs.existsSync as jest.Mock).mockImplementation(() => false);
+        });
+
+        it('should error when the --output option is missing', async function () {
+            process.chdir('tests/fixtures/import');
+            await expect(
+                program.parseAsync(['node', 'env-tool', 'import', 'input.env'])
+            ).rejects.toThrow();
+        });
+
+        it('should error when no environment variables are found in the input', async function () {
+            process.chdir('tests/fixtures/import');
+            (fs.readFileSync as jest.Mock).mockImplementation((filePath) => {
+                if (String(filePath).includes('envconfig.json')) {
+                    return JSON.stringify({});
+                }
+                if (String(filePath).includes('empty.env')) {
+                    return '';
+                }
+                return "";
+            });
+            await program.parseAsync(['node', 'env-tool', 'import', 'empty.env', '-o', 'out.env']);
+            expect(process.exitCode).toEqual(1);
+            expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('No environment variables found'));
+        });
+
+        it('should write imported values to the output file without encrypting unflagged keys', async function () {
+            process.chdir('tests/fixtures/import');
+            (fs.readFileSync as jest.Mock).mockImplementation((filePath) => {
+                if (String(filePath).includes('envconfig.json')) {
+                    return JSON.stringify({
+                        PLAIN: { required: true, default: '', comment: 'A plain value' }
+                    });
+                }
+                if (String(filePath).includes('input.env')) {
+                    return 'PLAIN=hello\n';
+                }
+                return "";
+            });
+            await program.parseAsync(['node', 'env-tool', 'import', 'input.env', '-o', 'out.env']);
+
+            expect(process.exitCode).toEqual(0);
+            const outCall = (fs.writeFileSync as jest.Mock).mock.calls.find(
+                call => String(call[0]).includes('out.env')
+            );
+            expect(outCall).toBeTruthy();
+            expect(outCall[1]).toContain('PLAIN=hello');
+        });
+    });
 });
 

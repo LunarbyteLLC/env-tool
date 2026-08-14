@@ -5,6 +5,7 @@ import { initCommand, InitOptions } from './commands/init';
 import { auditCommand, AuditOptions } from './commands/audit';
 import { validateCommand } from './commands/validate';
 import { syncCommand } from './commands/sync';
+import { importCommand, ImportOptions } from './commands/import';
 
 export function createCli() {
 
@@ -62,6 +63,14 @@ export function createCli() {
         .description('Sync an env file with the schema')
         .action((envfile: string) => {
             syncCommand(envfile, DEFAULT_SCHEMA_FILE);
+        });
+
+    program.command('import')
+        .argument('[inputfile]', 'Env file to import (reads from stdin if omitted or "-")')
+        .description('Import an unencrypted env file, encrypting values flagged "encrypted" in the schema')
+        .requiredOption('-o, --output <envfile>', 'Env file to write the imported values to (created if it does not exist)')
+        .action((inputfile: string | undefined, options: ImportOptions) => {
+            importCommand(inputfile, options, DEFAULT_SCHEMA_FILE);
         });
 
     return program;
