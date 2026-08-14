@@ -222,4 +222,4 @@ Behavior:
 
 ## License
 
-ISC
+See [LICENSE](./LICENSE)
