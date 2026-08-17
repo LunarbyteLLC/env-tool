@@ -29,6 +29,10 @@
   },
   "author": "Ben Daschel",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LunarbyteLLC/env-tool.git"
+  },
   "dependencies": {
     "commander": "^11.1.0",
     "dotenv": "^16.3.1"
