@@ -15,5 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3     # checkout the repo
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
       - run: npm ci                   # install packages
       - run: 'npm run test:ci'         # run tests (configured to use jest-junit reporter)

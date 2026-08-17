@@ -11,11 +11,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v7
         with:
-          node-version: '16'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-          always-auth: true
           scope: '@lunarbyte'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
