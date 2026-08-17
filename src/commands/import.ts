@@ -3,7 +3,7 @@ import path from "path";
 import process from "process";
 import { execFileSync } from "child_process";
 import { parse } from "dotenv";
-import { buildImportedEnvContent, extractPublicKeyLines, getKeysToEncrypt, loadSchema } from "../lib";
+import { buildImportedEnvContent, getKeysToEncrypt, loadSchema } from "../lib";
 
 export interface ImportOptions {
   output: string;
@@ -34,38 +34,40 @@ export function importCommand(
     return;
   }
 
-  const parsedEnv = parse(raw);
-  const keys = Object.keys(parsedEnv);
-  if (keys.length === 0) {
+  const importedValues = parse(raw);
+  const importedKeys = Object.keys(importedValues);
+  if (importedKeys.length === 0) {
     console.warn('No environment variables found in input.');
     process.exitCode = 1;
     return;
   }
 
   const outputExisted = fs.existsSync(outputFile);
-  // Preserve an existing dotenvx keypair so re-importing doesn't rotate it
-  const existingPublicKeyLines = outputExisted
-    ? extractPublicKeyLines(fs.readFileSync(outputFile, 'utf-8'))
-    : [];
+  const existingValues = outputExisted ? parse(fs.readFileSync(outputFile, 'utf-8')) : {};
+
+  // Imported values take precedence; anything already in the output file
+  // (documented or not, e.g. a dotenvx DOTENV_PUBLIC_KEY line) is preserved.
+  const combinedValues = { ...existingValues, ...importedValues };
 
   const outputDir = path.dirname(outputFile);
   if (outputDir && outputDir !== '.' && !fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const contents = buildImportedEnvContent(parsedEnv, existingPublicKeyLines);
+  const contents = buildImportedEnvContent(schema, combinedValues);
   fs.writeFileSync(outputFile, contents);
-  console.log(`${outputExisted ? 'Updated' : 'Created'} ${outputFile} with ${keys.length} imported value(s).`);
+  console.log(`${outputExisted ? 'Updated' : 'Created'} ${outputFile} with ${importedKeys.length} imported value(s).`);
 
-  const keysToEncrypt = getKeysToEncrypt(schema, keys);
+  const keysToEncrypt = getKeysToEncrypt(schema, Object.keys(combinedValues));
   if (keysToEncrypt.length === 0) {
-    console.log('No imported keys are marked "encrypted" in the schema; skipping encryption.');
+    console.log('No keys are marked "encrypted" in the schema; skipping encryption.');
     return;
   }
 
   // dotenvx bootstraps a public/private keypair automatically the first time
   // it encrypts a file that doesn't already have one (adding DOTENV_PUBLIC_KEY
   // to the output file and writing its private counterpart to a .env.keys file).
+  // Values that are already encrypted are left untouched (idempotent).
   try {
     const args = ['encrypt', '-f', outputFile];
     for (const key of keysToEncrypt) {

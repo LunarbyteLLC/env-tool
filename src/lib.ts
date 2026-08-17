@@ -167,36 +167,50 @@ export function syncEnvFile(schema: EnvSchema, currentValues: any) {
     return contents;
 }
 
-// Matches a DOTENV_PUBLIC_KEY line as written by dotenvx, e.g.:
-//   DOTENV_PUBLIC_KEY="02cd32ae..."
-//   DOTENV_PUBLIC_KEY_PRODUCTION="02cd32ae..."
-const PUBLIC_KEY_LINE_PATTERN = /^DOTENV_PUBLIC_KEY(_[A-Z0-9_]+)?=.*$/;
+// Matches a dotenvx public key entry, e.g. DOTENV_PUBLIC_KEY or DOTENV_PUBLIC_KEY_PRODUCTION
+const PUBLIC_KEY_PATTERN = /^DOTENV_PUBLIC_KEY(_[A-Z0-9_]+)?$/;
 
 /**
- * Extract any dotenvx `DOTENV_PUBLIC_KEY` line(s) from existing env file contents,
- * so a re-import can carry the existing keypair forward instead of dotenvx
- * generating a new one (which would orphan the existing .env.keys file).
+ * Build the contents of an imported env file using the same comment/value
+ * formatting as syncEnvFile, plus any values not documented in the schema
+ * (e.g. vars removed from the schema) are preserved unchanged at the end of
+ * the file. A dotenvx DOTENV_PUBLIC_KEY entry, if present, is always placed
+ * first, matching dotenvx's own file layout.
  */
-export function extractPublicKeyLines(content: string): string[] {
-    return content
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(line => PUBLIC_KEY_LINE_PATTERN.test(line));
-}
+export function buildImportedEnvContent(schema: EnvSchema, values: Record<string, string>): string {
+    const out: string[] = [];
+    const undocumentedKeys = new Set(Object.keys(values));
 
-/**
- * Build the contents of an imported env file, preserving any existing
- * dotenvx public key line(s) so re-imports don't rotate the keypair.
- */
-export function buildImportedEnvContent(values: Record<string, string>, publicKeyLines: string[] = []): string {
-    const lines: string[] = [...publicKeyLines];
-    for (const key in values) {
-        lines.push(`${key}=${values[key]}`);
+    for (const key of undocumentedKeys) {
+        if (PUBLIC_KEY_PATTERN.test(key)) {
+            out.push(`${key}=${values[key]}\n`);
+            undocumentedKeys.delete(key);
+        }
     }
-    if (lines.length === 0) {
-        return '';
+
+    for (const key in schema) {
+        const config = schema[key];
+        const isDefined = values.hasOwnProperty(key);
+        const currentValue = isDefined ? values[key] : undefined;
+
+        if (config.comment) {
+            out.push(`### ${config.comment}`)
+        }
+
+        if (isDefined) {
+            out.push(`${key}=${currentValue}\n`);
+        } else {
+            out.push(`${key}=${config.default}\n`)
+        }
+        undocumentedKeys.delete(key);
     }
-    return lines.join('\n') + '\n';
+
+    for (const key of undocumentedKeys) {
+        out.push(`${key}=${values[key]}\n`);
+    }
+
+    const contents = out.join('\n');
+    return contents;
 }
 
 /**

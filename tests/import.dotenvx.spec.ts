@@ -113,6 +113,58 @@ describe('env-tool import (e2e-ish)', () => {
     expect(parsedSecond.PLAIN).toEqual('world');
   });
 
+  it('writes schema comments above each key, matching sync formatting', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'input.env'), 'SECRET=topsecret\nPLAIN=hello\n');
+
+    await program.parseAsync(['node', 'env-tool', 'import', 'input.env', '-o', '.env']);
+
+    const outContent = fs.readFileSync(path.join(tmpDir, '.env'), 'utf-8');
+    expect(outContent).toMatch(/^### secret$/m);
+    expect(outContent).toMatch(/^### plain$/m);
+  });
+
+  it('preserves existing values in the output file that are not documented in the schema', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.env'),
+      'PLAIN=already_here\nUNDOCUMENTED_LEGACY_VAR=keep_me\n'
+    );
+
+    fs.writeFileSync(path.join(tmpDir, 'input.env'), 'SECRET=topsecret\n');
+    await program.parseAsync(['node', 'env-tool', 'import', 'input.env', '-o', '.env']);
+
+    expect(process.exitCode).toEqual(0);
+    const parsedOut = parse(fs.readFileSync(path.join(tmpDir, '.env'), 'utf-8'));
+
+    // Undocumented value already in the output file survives the import untouched
+    expect(parsedOut.UNDOCUMENTED_LEGACY_VAR).toEqual('keep_me');
+    // Documented value already in the output file, not part of this import, is kept too
+    expect(parsedOut.PLAIN).toEqual('already_here');
+    // The freshly imported, schema-documented value is encrypted
+    expect(parsedOut.SECRET).toMatch(/^encrypted:/);
+  });
+
+  it('keeps DOTENV_PUBLIC_KEY ahead of every other entry, even on re-import', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'input.env'), 'SECRET=first\nPLAIN=hello\n');
+    await program.parseAsync(['node', 'env-tool', 'import', 'input.env', '-o', '.env']);
+
+    // On first bootstrap dotenvx itself prepends a decorative comment banner
+    // above the key, so just assert the key precedes the schema-driven lines.
+    let lines = fs.readFileSync(path.join(tmpDir, '.env'), 'utf-8').split('\n').filter(l => l.length > 0);
+    let publicKeyIndex = lines.findIndex(l => /^DOTENV_PUBLIC_KEY=/.test(l));
+    let firstSchemaLineIndex = lines.findIndex(l => /^(SECRET|PLAIN)=/.test(l));
+    expect(publicKeyIndex).toBeGreaterThanOrEqual(0);
+    expect(publicKeyIndex).toBeLessThan(firstSchemaLineIndex);
+
+    // Re-import with the plain var appearing first in the pasted input this time
+    fs.writeFileSync(path.join(tmpDir, 'input.env'), 'PLAIN=world\nSECRET=second\n');
+    await program.parseAsync(['node', 'env-tool', 'import', 'input.env', '-o', '.env']);
+
+    // On re-import env-tool itself rebuilds the file (no dotenvx banner), so
+    // the public key line is now literally first.
+    lines = fs.readFileSync(path.join(tmpDir, '.env'), 'utf-8').split('\n').filter(l => l.length > 0);
+    expect(lines[0]).toMatch(/^DOTENV_PUBLIC_KEY=/);
+  });
+
   it('errors out when the input file does not exist', async () => {
     const consoleError = console.error;
     console.error = jest.fn();

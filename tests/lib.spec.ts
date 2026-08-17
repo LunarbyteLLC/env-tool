@@ -1,7 +1,6 @@
 import {
     audit,
     buildImportedEnvContent,
-    extractPublicKeyLines,
     generateEnvFile,
     getKeysToEncrypt,
     initSchema,
@@ -139,43 +138,85 @@ describe('env checker library', function () {
         expect(newEnv).matches(/^NEW_VAR=a_new_value$/gm);
     })
 
-    it('should extract DOTENV_PUBLIC_KEY lines from existing env file contents', function () {
-        const content = [
-            '#/---[DOTENV_PUBLIC_KEY]---/',
-            'DOTENV_PUBLIC_KEY="02cd32ae35cd7e4f"',
-            '',
-            '# .env',
-            'FOO=encrypted:abc123',
-            'BAR=plain',
-        ].join('\n');
+    it('should build imported env contents using the same formatting as sync, including comments', function () {
+        const schema = {
+            EXISTING_VAR: {
+                required: true,
+                default: '',
+                comment: 'This value already exists in the env'
+            },
+            NEW_VAR: {
+                required: true,
+                default: 'a_new_value',
+                comment: 'This will be added to the env file'
+            }
+        };
 
-        expect(extractPublicKeyLines(content)).to.deep.equal(['DOTENV_PUBLIC_KEY="02cd32ae35cd7e4f"']);
+        const values = {
+            EXISTING_VAR: 'an_existing_value',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+
+        expect(content).matches(/^### This value already exists in the env$/gm);
+        expect(content).matches(/^EXISTING_VAR=an_existing_value$/gm);
+        expect(content).matches(/^### This will be added to the env file$/gm);
+        expect(content).matches(/^NEW_VAR=a_new_value$/gm);
     });
 
-    it('should extract named DOTENV_PUBLIC_KEY_<ENV> lines', function () {
-        const content = 'DOTENV_PUBLIC_KEY_PRODUCTION="abc"\nFOO=bar';
-        expect(extractPublicKeyLines(content)).to.deep.equal(['DOTENV_PUBLIC_KEY_PRODUCTION="abc"']);
+    it('should preserve values not documented in the schema', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: ''},
+        };
+
+        const values = {
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY: 'abc123',
+            LEGACY_UNDOCUMENTED_VAR: 'still_here',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+
+        expect(content).matches(/^DOCUMENTED=a_value$/gm);
+        expect(content).matches(/^DOTENV_PUBLIC_KEY=abc123$/gm);
+        expect(content).matches(/^LEGACY_UNDOCUMENTED_VAR=still_here$/gm);
     });
 
-    it('should return no public key lines when none are present', function () {
-        expect(extractPublicKeyLines('FOO=bar\nBAZ=qux')).to.deep.equal([]);
+    it('should always place the DOTENV_PUBLIC_KEY entry first, ahead of schema and other undocumented keys', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: '', comment: 'a documented var'},
+        };
+
+        const values = {
+            LEGACY_UNDOCUMENTED_VAR: 'still_here',
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY: 'abc123',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+        const lines = content.split('\n').filter(line => line.length > 0);
+
+        expect(lines[0]).to.equal('DOTENV_PUBLIC_KEY=abc123');
     });
 
-    it('should build imported env contents preserving public key lines', function () {
-        const content = buildImportedEnvContent(
-            {FOO: 'bar', BAZ: 'qux'},
-            ['DOTENV_PUBLIC_KEY="abc"']
-        );
-        expect(content).to.equal('DOTENV_PUBLIC_KEY="abc"\nFOO=bar\nBAZ=qux\n');
+    it('should place a named DOTENV_PUBLIC_KEY_<ENV> entry first as well', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: ''},
+        };
+
+        const values = {
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY_PRODUCTION: 'abc123',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+        const lines = content.split('\n').filter(line => line.length > 0);
+
+        expect(lines[0]).to.equal('DOTENV_PUBLIC_KEY_PRODUCTION=abc123');
     });
 
-    it('should build imported env contents with no public key lines', function () {
-        const content = buildImportedEnvContent({FOO: 'bar'});
-        expect(content).to.equal('FOO=bar\n');
-    });
-
-    it('should return an empty string when there are no values to import', function () {
-        expect(buildImportedEnvContent({})).to.equal('');
+    it('should return an empty string when there are no schema keys or values to import', function () {
+        expect(buildImportedEnvContent({}, {})).to.equal('');
     });
 
     it('should determine which keys are flagged for encryption in the schema', function () {

@@ -179,10 +179,10 @@ env-tool sync .env
 
 ### Import
 
-Imports an existing plaintext env file, writes it to an output file, and encrypts any values whose
-key is flagged `"encrypted": true` in the schema. Encryption is handled by
-[dotenvx](https://dotenvx.com/) (installed as part of `env-tool init --with-dotenvx`, or manually
-with `npm install @dotenvx/dotenvx`).
+Imports an existing plaintext env file, merges it into an output file using the same comment/value
+formatting as `sync`, and encrypts any values whose key is flagged `"encrypted": true` in the
+schema. Encryption is handled by [dotenvx](https://dotenvx.com/) (installed as part of `env-tool
+init --with-dotenvx`, or manually with `npm install @dotenvx/dotenvx`).
 
 Input can come from a file argument or from stdin, and the output file is required:
 
@@ -199,17 +199,19 @@ env-tool import - --output env/prod/.env
 ```
 
 Behavior:
-- Every variable found in the input is written to the output file; values are written as plain
-  text unless their key is marked `encrypted: true` in the schema, in which case dotenvx encrypts
-  them in place after writing.
+- Like `sync`, every schema key is written to the output file with its comment, using the imported
+  value if one was provided, otherwise the value already in the output file, otherwise the schema
+  default.
+- Values are written as plain text unless their key is marked `encrypted: true` in the schema, in
+  which case dotenvx encrypts them in place after writing. Already-encrypted values are left alone.
+- Any value already in the output file that isn't documented in the schema (e.g. a dotenvx
+  `DOTENV_PUBLIC_KEY` line, or a var since removed from the schema) is preserved as-is.
 - If the output file doesn't already have a dotenvx keypair, one is bootstrapped automatically:
   dotenvx adds a `DOTENV_PUBLIC_KEY` entry to the output file and writes the matching private key
   to a `.env.keys` file alongside it. **Never commit `.env.keys` to source control** — `env-tool
   init --with-dotenvx` already adds `**/.env.keys` to `.gitignore` for you.
 - If the output file already has a keypair (e.g. from a previous import), it's reused rather than
   rotated, so previously distributed `.env.keys` files keep working.
-- Keys not present in the schema are imported as-is (plain text) — add `encrypted: true` to the
-  schema first if a value should be encrypted.
 
 ## Best Practices
 
