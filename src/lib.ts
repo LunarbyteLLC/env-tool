@@ -7,6 +7,7 @@ export interface EnvSchema {
         comment?: string;
         required: boolean;
         default: string;
+        encrypted?: boolean;
     }
 }
 export function scanVars(dir: string, useGit: boolean = true): string[] {
@@ -143,27 +144,65 @@ export function validate(schema: EnvSchema, envValues: any) {
     return issues;
 }
 
-export function syncEnvFile(schema: EnvSchema, currentValues: any) {
+/**
+ * Format each schema key as its comment (if any) followed by a `KEY=value`
+ * line, using the provided value when defined or the schema default otherwise.
+ * Shared by syncEnvFile and buildImportedEnvContent so both stay in sync.
+ */
+function formatSchemaEntries(schema: EnvSchema, values: Record<string, any>): string[] {
     const out: string[] = [];
     for (const key in schema) {
         const config = schema[key];
-
-        const isDefined = currentValues.hasOwnProperty(key)
-        const currentValue = isDefined ? currentValues[key] : undefined;
-
+        const isDefined = values.hasOwnProperty(key);
+        const currentValue = isDefined ? values[key] : config.default;
 
         if (config.comment) {
             out.push(`### ${config.comment}`)
         }
+        out.push(`${key}=${currentValue}\n`);
+    }
+    return out;
+}
 
-        if (isDefined) {
-            out.push(`${key}=${currentValue}\n`);
-        } else {
-            out.push(`${key}=${config.default}\n`)
+export function syncEnvFile(schema: EnvSchema, currentValues: any) {
+    return formatSchemaEntries(schema, currentValues).join('\n');
+}
+
+// Matches a dotenvx public key entry, e.g. DOTENV_PUBLIC_KEY or DOTENV_PUBLIC_KEY_PRODUCTION
+const PUBLIC_KEY_PATTERN = /^DOTENV_PUBLIC_KEY(_[A-Z0-9_]+)?$/;
+
+/**
+ * Build the contents of an imported env file using the same comment/value
+ * formatting as syncEnvFile, plus any values not documented in the schema
+ * (e.g. vars removed from the schema) are preserved unchanged at the end of
+ * the file. A dotenvx DOTENV_PUBLIC_KEY entry, if present, is always placed
+ * first, matching dotenvx's own file layout.
+ */
+export function buildImportedEnvContent(schema: EnvSchema, values: Record<string, string>): string {
+    const out: string[] = [];
+
+    for (const key of Object.keys(values)) {
+        if (PUBLIC_KEY_PATTERN.test(key)) {
+            out.push(`${key}=${values[key]}\n`);
         }
     }
-    const contents = out.join('\n');
-    return contents;
+
+    out.push(...formatSchemaEntries(schema, values));
+
+    for (const key of Object.keys(values)) {
+        if (!schema.hasOwnProperty(key) && !PUBLIC_KEY_PATTERN.test(key)) {
+            out.push(`${key}=${values[key]}\n`);
+        }
+    }
+
+    return out.join('\n');
+}
+
+/**
+ * Determine which of the given keys are flagged for encryption in the schema.
+ */
+export function getKeysToEncrypt(schema: EnvSchema, keys: string[]): string[] {
+    return keys.filter(key => schema[key]?.encrypted === true);
 }
 
 /**

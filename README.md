@@ -1,6 +1,6 @@
 # @lunarbyte/env-tool
 
-Stop managing environment variables manually. This CLI scans your codebase for `process.env` usages, generates a schema, and validates your `.env` files—with optional encrypted secrets via [dotenvx](https://github.com/dotenvx/dotenvx).
+Stop managing environment variables manually. This CLI scans your codebase for `process.env` usages, generates a schema, validates your `.env` files, and can bulk-import existing secrets—with optional encrypted secrets via [dotenvx](https://github.com/dotenvx/dotenvx).
 
 ## Quick Start
 
@@ -22,6 +22,7 @@ That's it. You now have an `envconfig.json` schema and npm scripts ready to go.
 | `env-tool audit <dir>` | Find `process.env` vars missing from schema (CI blocker) |
 | `env-tool validate <envfile>` | Check `.env` file has all required vars |
 | `env-tool sync <envfile>` | Update `.env` with new vars from schema |
+| `env-tool import [file] -o <envfile>` | Import a plaintext env file (or stdin), encrypting `encrypted: true` schema keys |
 
 ### Init Options
 
@@ -54,7 +55,27 @@ env/
     └── .env.keys     # Encryption key (auto-gitignored)
 ```
 
+### Bulk Importing Existing Secrets
+
+Already have a plaintext `.env` file lying around (from a teammate, an old deploy script, or a server)? Import it directly instead of running `dotenvx set` for every variable one at a time:
+
+```bash
+# Import from a file
+env-tool import plaintext.env --output env/prod/.env
+
+# Import from stdin
+cat plaintext.env | env-tool import --output env/prod/.env
+pbpaste | env-tool import --output env/prod/.env
+```
+
+- Every schema key is written with its comment, using the same formatting as `sync` — the imported value wins if provided, otherwise the value already in the output file is kept, otherwise the schema default is used.
+- Keys flagged `"encrypted": true` in `envconfig.json` are encrypted via dotenvx after writing; already-encrypted values are left alone.
+- Values not documented in the schema (e.g. an existing `DOTENV_PUBLIC_KEY` line) are preserved as-is.
+- If the output file doesn't already have a keypair, dotenvx bootstraps one automatically (adding `DOTENV_PUBLIC_KEY` to the file and writing the matching private key to `.env.keys`, which is auto-gitignored). If it already has a keypair, it's reused rather than rotated, so previously distributed `.env.keys` files keep working.
+
 ### Managing Secrets
+
+For one-off changes to a single value, use dotenvx directly:
 
 ```bash
 # Add/update a secret (encrypts automatically)
@@ -154,17 +175,17 @@ npm install -g @lunarbyte/env-tool
 env-tool init src/ --with-dotenvx
 ```
 
-### 2. Copy Current Production Values
+### 2. Import Current Production Values
 
 ```bash
-# SSH to your server, copy current .env contents
-# Then locally:
-cd env/prod
-# Paste values using dotenvx set for each secret:
-dotenvx set DATABASE_URL "your-prod-value"
-dotenvx set API_KEY "your-prod-value"
-# ... repeat for each var
+# SSH to your server, copy the current .env contents to your clipboard
+# Then locally, pipe them straight into env-tool:
+pbpaste | env-tool import --output env/prod/.env
 ```
+
+Any key flagged `"encrypted": true` in `envconfig.json` (e.g. `DATABASE_URL`, `API_KEY`) is encrypted
+automatically as part of the import — no need to run `dotenvx set` for each one individually. See
+[Bulk Importing Existing Secrets](#bulk-importing-existing-secrets) above.
 
 ### 3. Commit Encrypted Env Files
 
@@ -206,14 +227,16 @@ dotenvx run -- npm start
   "DATABASE_URL": {
     "required": true,
     "default": "",
-    "comment": "Postgres connection string"
+    "comment": "Postgres connection string",
+    "encrypted": true
   }
 }
 ```
 
 - `required: true` → `validate` fails if missing or empty
-- `default` → Used by `sync` when creating new `.env` entries
+- `default` → Used by `sync` (and `import`) when no other value is available
 - `comment` → Added as `###` comments in generated `.env` files
+- `encrypted: true` → Value is encrypted via dotenvx when brought in through `env-tool import`
 
 ---
 
@@ -224,12 +247,13 @@ dotenvx run -- npm start
 | New project setup | `env-tool init src/ --with-dotenvx` |
 | New developer onboarding | `npm run env:sync` |
 | Added new env var to code | `npm run env:init --force` then `npm run env:sync` |
+| Bulk import/migrate existing secrets | `env-tool import prod.env -o env/prod/.env` |
 | Pre-merge CI check | `env-tool audit src/` |
 | Pre-deploy validation | `env-tool validate env/prod/.env` |
-| Update a secret | `cd env/prod && dotenvx set KEY value` |
+| Update a single secret | `cd env/prod && dotenvx set KEY value` |
 
 ---
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE)

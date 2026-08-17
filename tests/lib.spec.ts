@@ -1,4 +1,14 @@
-import {audit, generateEnvFile, initSchema, loadSchema, scanVars, syncEnvFile, validate} from "../src/lib";
+import {
+    audit,
+    buildImportedEnvContent,
+    generateEnvFile,
+    getKeysToEncrypt,
+    initSchema,
+    loadSchema,
+    scanVars,
+    syncEnvFile,
+    validate
+} from "../src/lib";
 import {expect} from "chai";
 import path from "path";
 
@@ -127,4 +137,96 @@ describe('env checker library', function () {
         expect(newEnv).matches(/^EXISTING_VAR=an_existing_value$/gm);
         expect(newEnv).matches(/^NEW_VAR=a_new_value$/gm);
     })
+
+    it('should build imported env contents using the same formatting as sync, including comments', function () {
+        const schema = {
+            EXISTING_VAR: {
+                required: true,
+                default: '',
+                comment: 'This value already exists in the env'
+            },
+            NEW_VAR: {
+                required: true,
+                default: 'a_new_value',
+                comment: 'This will be added to the env file'
+            }
+        };
+
+        const values = {
+            EXISTING_VAR: 'an_existing_value',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+
+        expect(content).matches(/^### This value already exists in the env$/gm);
+        expect(content).matches(/^EXISTING_VAR=an_existing_value$/gm);
+        expect(content).matches(/^### This will be added to the env file$/gm);
+        expect(content).matches(/^NEW_VAR=a_new_value$/gm);
+    });
+
+    it('should preserve values not documented in the schema', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: ''},
+        };
+
+        const values = {
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY: 'abc123',
+            LEGACY_UNDOCUMENTED_VAR: 'still_here',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+
+        expect(content).matches(/^DOCUMENTED=a_value$/gm);
+        expect(content).matches(/^DOTENV_PUBLIC_KEY=abc123$/gm);
+        expect(content).matches(/^LEGACY_UNDOCUMENTED_VAR=still_here$/gm);
+    });
+
+    it('should always place the DOTENV_PUBLIC_KEY entry first, ahead of schema and other undocumented keys', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: '', comment: 'a documented var'},
+        };
+
+        const values = {
+            LEGACY_UNDOCUMENTED_VAR: 'still_here',
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY: 'abc123',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+        const lines = content.split('\n').filter(line => line.length > 0);
+
+        expect(lines[0]).to.equal('DOTENV_PUBLIC_KEY=abc123');
+    });
+
+    it('should place a named DOTENV_PUBLIC_KEY_<ENV> entry first as well', function () {
+        const schema = {
+            DOCUMENTED: {required: true, default: ''},
+        };
+
+        const values = {
+            DOCUMENTED: 'a_value',
+            DOTENV_PUBLIC_KEY_PRODUCTION: 'abc123',
+        };
+
+        const content = buildImportedEnvContent(schema, values);
+        const lines = content.split('\n').filter(line => line.length > 0);
+
+        expect(lines[0]).to.equal('DOTENV_PUBLIC_KEY_PRODUCTION=abc123');
+    });
+
+    it('should return an empty string when there are no schema keys or values to import', function () {
+        expect(buildImportedEnvContent({}, {})).to.equal('');
+    });
+
+    it('should determine which keys are flagged for encryption in the schema', function () {
+        const schema = {
+            SECRET: {required: true, default: '', encrypted: true},
+            PLAIN: {required: true, default: ''},
+            NOT_IMPORTED: {required: true, default: '', encrypted: true},
+        };
+
+        const keysToEncrypt = getKeysToEncrypt(schema, ['SECRET', 'PLAIN']);
+        expect(keysToEncrypt).to.deep.equal(['SECRET']);
+    });
 })
