@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -16,8 +21,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           scope: '@lunarbyte'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Install Dependencies
         run: npm install
