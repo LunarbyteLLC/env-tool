@@ -144,27 +144,28 @@ export function validate(schema: EnvSchema, envValues: any) {
     return issues;
 }
 
-export function syncEnvFile(schema: EnvSchema, currentValues: any) {
+/**
+ * Format each schema key as its comment (if any) followed by a `KEY=value`
+ * line, using the provided value when defined or the schema default otherwise.
+ * Shared by syncEnvFile and buildImportedEnvContent so both stay in sync.
+ */
+function formatSchemaEntries(schema: EnvSchema, values: Record<string, any>): string[] {
     const out: string[] = [];
     for (const key in schema) {
         const config = schema[key];
-
-        const isDefined = currentValues.hasOwnProperty(key)
-        const currentValue = isDefined ? currentValues[key] : undefined;
-
+        const isDefined = values.hasOwnProperty(key);
+        const currentValue = isDefined ? values[key] : config.default;
 
         if (config.comment) {
             out.push(`### ${config.comment}`)
         }
-
-        if (isDefined) {
-            out.push(`${key}=${currentValue}\n`);
-        } else {
-            out.push(`${key}=${config.default}\n`)
-        }
+        out.push(`${key}=${currentValue}\n`);
     }
-    const contents = out.join('\n');
-    return contents;
+    return out;
+}
+
+export function syncEnvFile(schema: EnvSchema, currentValues: any) {
+    return formatSchemaEntries(schema, currentValues).join('\n');
 }
 
 // Matches a dotenvx public key entry, e.g. DOTENV_PUBLIC_KEY or DOTENV_PUBLIC_KEY_PRODUCTION
@@ -179,38 +180,22 @@ const PUBLIC_KEY_PATTERN = /^DOTENV_PUBLIC_KEY(_[A-Z0-9_]+)?$/;
  */
 export function buildImportedEnvContent(schema: EnvSchema, values: Record<string, string>): string {
     const out: string[] = [];
-    const undocumentedKeys = new Set(Object.keys(values));
 
-    for (const key of undocumentedKeys) {
+    for (const key of Object.keys(values)) {
         if (PUBLIC_KEY_PATTERN.test(key)) {
             out.push(`${key}=${values[key]}\n`);
-            undocumentedKeys.delete(key);
         }
     }
 
-    for (const key in schema) {
-        const config = schema[key];
-        const isDefined = values.hasOwnProperty(key);
-        const currentValue = isDefined ? values[key] : undefined;
+    out.push(...formatSchemaEntries(schema, values));
 
-        if (config.comment) {
-            out.push(`### ${config.comment}`)
+    for (const key of Object.keys(values)) {
+        if (!schema.hasOwnProperty(key) && !PUBLIC_KEY_PATTERN.test(key)) {
+            out.push(`${key}=${values[key]}\n`);
         }
-
-        if (isDefined) {
-            out.push(`${key}=${currentValue}\n`);
-        } else {
-            out.push(`${key}=${config.default}\n`)
-        }
-        undocumentedKeys.delete(key);
     }
 
-    for (const key of undocumentedKeys) {
-        out.push(`${key}=${values[key]}\n`);
-    }
-
-    const contents = out.join('\n');
-    return contents;
+    return out.join('\n');
 }
 
 /**
